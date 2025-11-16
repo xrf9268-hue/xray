@@ -20,7 +20,7 @@ readonly _XRF_ERROR_CODES_LOADED=1
 ##
 
 # Documentation base URL (can be overridden)
-readonly XRF_DOCS_BASE="${XRF_DOCS_BASE:-https://github.com/Joe-oss9527/xray-fusion}"
+readonly XRF_DOCS_BASE="${XRF_DOCS_BASE:-https://github.com/xrf9268-hue/xray}"
 
 ##
 # Display an enhanced error message with recovery guidance
