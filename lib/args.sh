@@ -23,6 +23,7 @@ args::init() {
   XRF_YES="false"
   XRF_DRY_RUN="false"
   TEMPLATE=""
+  FINGERPRINT="${DEFAULT_XRAY_FINGERPRINT}"
 
   # Tracking flags for explicit CLI arguments (used by template override logic)
   _TOPOLOGY_EXPLICIT=""
@@ -43,6 +44,11 @@ args::parse() {
       --domain | -d)
         args::validate_domain "${2:-}" || return 1
         DOMAIN="${2}"
+        shift 2
+        ;;
+      --fingerprint | -f)
+        args::validate_fingerprint "${2:-}" || return 1
+        FINGERPRINT="${2}"
         shift 2
         ;;
       --version | -v)
@@ -104,7 +110,7 @@ args::parse() {
   fi
 
   # Export variables for use by other modules
-  export TOPOLOGY DOMAIN VERSION PLUGINS DEBUG UUID UUID_FROM_STRING XRF_YES XRF_DRY_RUN TEMPLATE
+  export TOPOLOGY DOMAIN VERSION PLUGINS DEBUG UUID UUID_FROM_STRING XRF_YES XRF_DRY_RUN TEMPLATE FINGERPRINT
   export _TOPOLOGY_EXPLICIT _VERSION_EXPLICIT _PLUGINS_EXPLICIT
 
   return 0
@@ -185,6 +191,23 @@ args::validate_version() {
   return 0
 }
 
+# Fingerprint validation
+args::validate_fingerprint() {
+  local fingerprint="${1:-}"
+  if [[ -z "${fingerprint}" ]]; then
+    core::log error "fingerprint cannot be empty" "{}"
+    return 1
+  fi
+
+  # Use shared validator (accepts chrome/firefox/safari/ios/android/edge/360/qq/random/randomized)
+  if ! validators::fingerprint "${fingerprint}"; then
+    core::log error "invalid fingerprint" "$(printf '{"fingerprint":"%s","valid":"chrome|firefox|safari|ios|android|edge|360|qq|random|randomized"}' "${fingerprint}")"
+    return 1
+  fi
+
+  return 0
+}
+
 # Configuration validation
 args::validate_config() {
   # vision-reality topology requires domain
@@ -202,6 +225,8 @@ args::show_help() {
 Options:
   --topology, -t <type>         Installation topology (reality-only|vision-reality)
   --domain, -d <domain>         Domain for vision-reality topology (required)
+  --fingerprint, -f <type>      TLS fingerprint (default: chrome)
+                                Valid: chrome, firefox, safari, ios, android, edge, 360, qq, random, randomized
   --version, -v <version>       Xray version to install (default: latest)
   --template <id>               Use pre-built template (home|office|server)
   --plugins, -p <list>          Comma-separated list of plugins to enable
@@ -243,8 +268,8 @@ EOF
 # Show current configuration (debug helper)
 args::show_config() {
   if [[ "${DEBUG}" == "true" ]]; then
-    core::log debug "parsed arguments" "$(printf '{"topology":"%s","domain":"%s","version":"%s","plugins":"%s","debug":"%s"}' \
-      "${TOPOLOGY}" "${DOMAIN}" "${VERSION}" "${PLUGINS}" "${DEBUG}")"
+    core::log debug "parsed arguments" "$(printf '{"topology":"%s","domain":"%s","version":"%s","plugins":"%s","fingerprint":"%s","debug":"%s"}' \
+      "${TOPOLOGY}" "${DOMAIN}" "${VERSION}" "${PLUGINS}" "${FINGERPRINT}" "${DEBUG}")"
   fi
 }
 
@@ -253,6 +278,11 @@ args::export_vars() {
   # Set XRAY_DOMAIN for Xray configuration
   if [[ -n "${DOMAIN}" ]]; then
     export XRAY_DOMAIN="${DOMAIN}"
+  fi
+
+  # Set XRAY_FINGERPRINT for client link generation
+  if [[ -n "${FINGERPRINT}" ]]; then
+    export XRAY_FINGERPRINT="${FINGERPRINT}"
   fi
 
   # Set XRF_DEBUG for core module

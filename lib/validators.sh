@@ -246,6 +246,57 @@ validators::shortid() {
 }
 
 ##
+# Validate TLS fingerprint for Xray/VLESS protocol
+#
+# Validates fingerprint conforms to supported Xray client fingerprints.
+# These fingerprints are used to mimic different browsers/clients.
+#
+# Arguments:
+#   $1 - Fingerprint string (string, required)
+#
+# Returns:
+#   0 - Valid fingerprint
+#   1 - Invalid fingerprint (empty or not in supported list)
+#
+# Supported Fingerprints:
+#   - chrome: Google Chrome browser
+#   - firefox: Mozilla Firefox browser
+#   - safari: Apple Safari browser
+#   - ios: iOS devices (iPhone/iPad)
+#   - android: Android devices
+#   - edge: Microsoft Edge browser
+#   - 360: 360 Secure Browser
+#   - qq: QQ Browser
+#   - random: Random fingerprint (legacy)
+#   - randomized: Randomized fingerprint (recommended)
+#
+# Example:
+#   validators::fingerprint "chrome"      # Valid
+#   validators::fingerprint "randomized"  # Valid
+#   validators::fingerprint "invalid"     # Invalid
+##
+validators::fingerprint() {
+  local fp="${1:-}"
+
+  # Empty check
+  if [[ -z "${fp}" ]]; then
+    core::log debug "fingerprint validation failed: empty" "{}"
+    return 1
+  fi
+
+  # Check against supported fingerprints
+  case "${fp}" in
+    chrome | firefox | safari | ios | android | edge | 360 | qq | random | randomized)
+      return 0
+      ;;
+    *)
+      core::log debug "fingerprint validation failed: unsupported" "$(printf '{"fingerprint":"%s","valid":"chrome|firefox|safari|ios|android|edge|360|qq|random|randomized"}' "${fp}")"
+      return 1
+      ;;
+  esac
+}
+
+##
 # Validate version string
 #
 # Validates version conforms to semantic versioning or 'latest' keyword.
