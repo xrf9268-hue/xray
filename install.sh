@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # xray-fusion online installer
-# Usage: curl -sL https://raw.githubusercontent.com/Joe-oss9527/xray-fusion/main/install.sh | bash -s -- [options]
+# Usage: curl -sL https://raw.githubusercontent.com/xrf9268-hue/xray/main/install.sh | bash -s -- [options]
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-REPO_URL="${XRF_REPO_URL:-https://github.com/Joe-oss9527/xray-fusion.git}"
+REPO_URL="${XRF_REPO_URL:-https://github.com/xrf9268-hue/xray.git}"
 BRANCH="${XRF_BRANCH:-main}"
 INSTALL_DIR="${XRF_INSTALL_DIR:-/usr/local/xray-fusion}"
 
