@@ -52,7 +52,8 @@ x25519::parse_keys() {
     value="$(x25519::trim "${value}")"
     value_clean="$(x25519::sanitize_token "${value}")"
 
-    if [[ "${normalized}" == *private*key* ]]; then
+    # Match PrivateKey or "Private key"
+    if [[ "${normalized}" == *private*key* || "${normalized}" == "privatekey" ]]; then
       if [[ "${value_clean}" =~ ^[A-Za-z0-9+/=_-]{4,}$ && -z "${private}" ]]; then
         private="${value}"
         expect=""
@@ -62,7 +63,9 @@ x25519::parse_keys() {
       continue
     fi
 
-    if [[ "${normalized}" == *public*key* ]]; then
+    # Match PublicKey, "Public key", or Password (new format)
+    # In Xray v25.8.31+, the public key is labeled "Password"
+    if [[ "${normalized}" == *public*key* || "${normalized}" == "publickey" || "${normalized}" == "password" ]]; then
       if [[ "${value_clean}" =~ ^[A-Za-z0-9+/=_-]{4,}$ && -z "${public}" ]]; then
         public="${value}"
         expect=""

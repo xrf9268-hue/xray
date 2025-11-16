@@ -68,6 +68,28 @@ teardown() {
   [ "${public}" = "HHHH=" ]
 }
 
+@test "x25519::parse_keys handles new PrivateKey/Password format" {
+  local output
+  output=$(x25519::parse_keys $'PrivateKey: cAP6oEHFfJ1MK3yB4xxY6hW1t4xiwA1YbX6Zx1vVumI\nPassword: j5-GwxUecl-6rL6WFFRwjj0gJKz9V3Etwi8srN3_Mn4\nHash32: HybzUCUvGM1ImrMBtuDDdNmGSVZWj-1_kU94OracVT8')
+  local -a parsed=()
+  readarray -t parsed <<< "${output}"
+  local private="${parsed[0]:-}"
+  local public="${parsed[1]:-}"
+  [ "${private}" = "cAP6oEHFfJ1MK3yB4xxY6hW1t4xiwA1YbX6Zx1vVumI" ]
+  [ "${public}" = "j5-GwxUecl-6rL6WFFRwjj0gJKz9V3Etwi8srN3_Mn4" ]
+}
+
+@test "x25519::parse_keys handles new format with std-encoding" {
+  local output
+  output=$(x25519::parse_keys $'PrivateKey: AAdaiNXJJ0vBspzw8/7Eko+9BvbbCKN7DaI/W1/XJVA=\nPassword: mZfV1WnfSeV9suWvikz6p/GWCJWl7XA6e39sVe7Mkho=\nHash32: D3xVwaYj8qQ738EqlV1pAFvaTud/NSduEX8b07gM83M=')
+  local -a parsed=()
+  readarray -t parsed <<< "${output}"
+  local private="${parsed[0]:-}"
+  local public="${parsed[1]:-}"
+  [ "${private}" = "AAdaiNXJJ0vBspzw8/7Eko+9BvbbCKN7DaI/W1/XJVA=" ]
+  [ "${public}" = "mZfV1WnfSeV9suWvikz6p/GWCJWl7XA6e39sVe7Mkho=" ]
+}
+
 @test "x25519::derive_public_key uses --key flag when available" {
   local fake_xray="${BATS_TEST_TMPDIR}/xray-bin"
   cat <<'SCRIPT' > "${fake_xray}"
