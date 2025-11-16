@@ -14,7 +14,7 @@ main() {
   local state
   state="$(state::load)"
 
-  # Performance optimization: Extract all fields in single jq call (11→1 fork)
+  # Performance optimization: Extract all fields in single jq call (12→1 fork)
   # jq emits newline-delimited values; mapfile preserves empty fields
   local -a fields=()
   mapfile -t fields < <(
@@ -30,7 +30,8 @@ main() {
         .xray.uuid_reality // "",
         .xray.domain // "",
         .xray.uuid // "",
-        .xray.port // "443"
+        .xray.port // "443",
+        .xray.fingerprint // "chrome"
       ] | .[] // ""
     '
   )
@@ -45,6 +46,7 @@ main() {
   local dom="${fields[8]:-}"
   local uuid="${fields[9]:-}"
   local port="${fields[10]:-}"
+  local fp="${fields[11]:-chrome}"
   # Ensure shortId is correct: if empty, try to read from config file
   if [[ -z "${sid}" && -f "$(xray::active)/05_inbounds.json" ]]; then
     sid="$(jq -r '.inbounds[]?.streamSettings?.realitySettings?.shortIds?[1] // .inbounds[]?.streamSettings?.realitySettings?.shortIds?[0] // empty' "$(xray::active)/05_inbounds.json" 2> /dev/null | head -1)"
@@ -58,12 +60,12 @@ main() {
     vision-reality)
       # All fields already extracted in single jq call above
       if [[ -n "${dom}" && -n "${uv}" ]]; then
-        local vlink="vless://${uv}@${dom}:${vport}?security=tls&flow=xtls-rprx-vision&sni=${dom}&fp=chrome#Vision-${dom}"
+        local vlink="vless://${uv}@${dom}:${vport}?security=tls&flow=xtls-rprx-vision&sni=${dom}&fp=${fp}#Vision-${dom}"
         echo "VISION : ${vlink}"
         links+=("${vlink}")
       fi
       if [[ -n "${ur}" && -n "${pbk}" && -n "${sid}" ]]; then
-        local rlink="vless://${ur}@${ip}:${rport}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=chrome&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
+        local rlink="vless://${ur}@${ip}:${rport}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
         echo "REALITY: ${rlink}"
         links+=("${rlink}")
       fi
@@ -71,11 +73,11 @@ main() {
     *)
       # All fields already extracted in single jq call above (reality-only topology)
       if [[ -n "${uuid}" && -n "${pbk}" && -n "${sid}" ]]; then
-        local link="vless://${uuid}@${ip}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=chrome&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
+        local link="vless://${uuid}@${ip}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
         echo "REALITY: ${link}"
         links+=("${link}")
       else
-        echo "REALITY: vless://<UUID>@${ip}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=chrome&pbk=<PUBLIC_KEY>&sid=<SHORT_ID>&spx=%2F#REALITY-${ip}"
+        echo "REALITY: vless://<UUID>@${ip}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=<PUBLIC_KEY>&sid=<SHORT_ID>&spx=%2F#REALITY-${ip}"
       fi
       ;;
   esac

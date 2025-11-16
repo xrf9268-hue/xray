@@ -262,6 +262,21 @@ main() {
     fi
   fi
 
+  # Verify public key matches private key if both are provided
+  if [[ -n "${XRAY_PRIVATE_KEY:-}" && -n "${XRAY_PUBLIC_KEY:-}" && -x "$(xray::bin)" ]]; then
+    core::log debug "verifying public key matches private key" "{}"
+    local verified_public
+    if verified_public="$(x25519::derive_public_key "$(xray::bin)" "${XRAY_PRIVATE_KEY}" 2> /dev/null)"; then
+      if [[ "${verified_public}" != "${XRAY_PUBLIC_KEY}" ]]; then
+        core::log error "public key does not match private key" '{"suggestion":"regenerate keypair with: xray x25519"}'
+        exit 1
+      fi
+      core::log debug "verified public key matches private key" "{}"
+    else
+      core::log warn "unable to verify public key (xray x25519 failed)" '{"continuing":"yes"}'
+    fi
+  fi
+
   export XRAY_SNIFFING="${XRAY_SNIFFING:-false}"
   export XRAY_UUID XRAY_UUID_VISION XRAY_UUID_REALITY XRAY_SHORT_ID XRAY_SHORT_ID_2 XRAY_SHORT_ID_3 XRAY_SNI XRAY_REALITY_DEST \
     XRAY_PORT XRAY_VISION_PORT XRAY_REALITY_PORT XRAY_DOMAIN XRAY_CERT_DIR XRAY_FALLBACK_PORT \
@@ -283,11 +298,13 @@ main() {
       --arg vport "${XRAY_VISION_PORT}" --arg rport "${XRAY_REALITY_PORT}" \
       --arg vuuid "${XRAY_UUID_VISION}" --arg ruuid "${XRAY_UUID_REALITY}" \
       --arg domain "${XRAY_DOMAIN}" --arg sni "${XRAY_SNI}" --arg sid "${XRAY_SHORT_ID:-}" --arg pbk "${XRAY_PUBLIC_KEY:-}" \
-      '{name:$name,version:$ver,installed_at:$ts,xray:{vision_port:($vport|tonumber),reality_port:($rport|tonumber),uuid_vision:$vuuid,uuid_reality:$ruuid,domain:$domain,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk}}')
+      --arg fp "${XRAY_FINGERPRINT:-chrome}" \
+      '{name:$name,version:$ver,installed_at:$ts,xray:{vision_port:($vport|tonumber),reality_port:($rport|tonumber),uuid_vision:$vuuid,uuid_reality:$ruuid,domain:$domain,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk,fingerprint:$fp}}')
   else
     state=$(jq -n --arg name "reality-only" --arg ver "${version}" --arg ts "${now}" \
       --arg port "${XRAY_PORT}" --arg uuid "${XRAY_UUID}" --arg sni "${XRAY_SNI}" --arg sid "${XRAY_SHORT_ID:-}" --arg pbk "${XRAY_PUBLIC_KEY:-}" \
-      '{name:$name,version:$ver,installed_at:$ts,xray:{port:($port|tonumber),uuid:$uuid,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk}}')
+      --arg fp "${XRAY_FINGERPRINT:-chrome}" \
+      '{name:$name,version:$ver,installed_at:$ts,xray:{port:($port|tonumber),uuid:$uuid,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk,fingerprint:$fp}}')
   fi
   state::save "${state}"
 
