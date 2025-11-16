@@ -669,6 +669,127 @@ exec 200>> "${lock}"  # Now succeeds for all users
 
 **Reference**: See `lib/core.sh::with_flock()` for production implementation
 
+### Upstream Tool Compatibility
+
+When integrating with external tools (e.g., Xray, Docker, systemd), their output format may change between versions. Always design parsers to be robust and backward-compatible.
+
+**⚠️ Real-World Case: Xray x25519 Format Change**
+
+Xray-core changed x25519 output format in v25.8.31+ (2024):
+```bash
+# Old format (pre-v25.8.31)
+Private key: <base64-value>
+Public key: <base64-value>
+
+# New format (v25.8.31+)
+PrivateKey: <base64url-value>
+Password: <base64url-value>      ← Public key renamed to discourage sharing
+Hash32: <base64url-value>         ← VLESS Encryption only
+```
+
+**❌ Fragile: Hard-coded pattern matching**
+```bash
+# Breaks when format changes
+private_key=$(echo "${output}" | grep "Private key:" | awk '{print $3}')
+public_key=$(echo "${output}" | grep "Public key:" | awk '{print $3}')
+```
+
+**✅ Robust: Normalized label matching with multiple patterns**
+```bash
+x25519::parse_keys() {
+  local output="${1}" line label value normalized
+  local private="" public=""
+
+  while IFS= read -r line; do
+    [[ "${line}" != *:* ]] && continue
+
+    label="${line%%:*}"
+    value="${line#*:}"
+
+    # Normalize: lowercase, remove spaces, keep only letters
+    normalized="${label,,}"
+    normalized="${normalized//[[:space:]]/}"
+    normalized="${normalized//[^a-z]/}"
+    value="$(trim "${value}")"
+
+    # Match both old and new formats
+    # "Private key" → "privatekey", "PrivateKey" → "privatekey"
+    if [[ "${normalized}" == *private*key* || "${normalized}" == "privatekey" ]]; then
+      [[ -z "${private}" ]] && private="${value}"
+    fi
+
+    # "Public key" → "publickey", "PublicKey" → "publickey"
+    # "Password" → "password" (new format)
+    if [[ "${normalized}" == *public*key* || "${normalized}" == "publickey" || "${normalized}" == "password" ]]; then
+      [[ -z "${public}" ]] && public="${value}"
+    fi
+  done <<< "${output}"
+
+  printf '%s\n%s\n' "${private}" "${public}"
+}
+```
+
+**Best Practices for External Tool Integration**:
+
+1. **Test with actual tool output**, not mocked data
+   ```bash
+   # Download and test with real binary
+   xray x25519 > test_output.txt
+   ./parse_function.sh < test_output.txt
+   ```
+
+2. **Normalize before matching**
+   - Convert to lowercase
+   - Remove whitespace
+   - Strip special characters
+   - Use pattern matching (`*substring*`) over exact matches
+
+3. **Add version-specific test cases**
+   ```bash
+   @test "x25519::parse_keys handles old format (pre-v25.8.31)" {
+     output=$(x25519::parse_keys 'Private key: ABC=\nPublic key: XYZ=')
+     [ "${output}" = $'ABC=\nXYZ=' ]
+   }
+
+   @test "x25519::parse_keys handles new format (v25.8.31+)" {
+     output=$(x25519::parse_keys 'PrivateKey: ABC\nPassword: XYZ\nHash32: 123')
+     [ "${output}" = $'ABC\nXYZ' ]
+   }
+   ```
+
+4. **Document format changes in comments**
+   ```bash
+   # In Xray v25.8.31+, the public key field was renamed from
+   # "Public key" to "Password" to discourage users from sharing it
+   # publicly (GitHub discussion #5084).
+   if [[ "${normalized}" == "password" ]]; then
+     public="${value}"
+   fi
+   ```
+
+5. **Check upstream changelogs and discussions**
+   - Review GitHub releases, discussions, issues
+   - Search for format change announcements
+   - Understand *why* the change was made (affects parser design)
+
+6. **Fail gracefully with actionable errors**
+   ```bash
+   if [[ -z "${private}" || -z "${public}" ]]; then
+     core::log error "failed to parse x25519 keypair" \
+       '{"suggestion":"verify xray x25519 output format","output_sample":"'"${output:0:100}"'"}'
+     return 1
+   fi
+   ```
+
+**Anti-Patterns to Avoid**:
+- ❌ Relying on exact whitespace or capitalization
+- ❌ Using hardcoded array indices (e.g., `awk '{print $3}'`)
+- ❌ Skipping validation when parsing succeeds
+- ❌ Not testing with multiple tool versions
+- ❌ Ignoring upstream release notes
+
+**Reference**: Fixed in commit dfbce58 (2025-11-16) - lib/x25519.sh parser upgrade for Xray v25.8.31+ compatibility
+
 ## Testing Guidelines
 - Test framework: bats-core with 119 unit tests across 5 test files.
 - Fast feedback: `make lint && make fmt && make test-unit`.
