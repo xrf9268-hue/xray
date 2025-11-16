@@ -2,7 +2,7 @@
 
 A lightweight Xray management tool focused on simple and reliable deployment.
 
-[![Tests](https://github.com/Joe-oss9527/xray-fusion/actions/workflows/test.yml/badge.svg)](https://github.com/Joe-oss9527/xray-fusion/actions/workflows/test.yml)
+[![Tests](https://github.com/xrf9268-hue/xray/actions/workflows/test.yml/badge.svg)](https://github.com/xrf9268-hue/xray/actions/workflows/test.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ## Why Xray-Fusion?
@@ -18,16 +18,16 @@ A lightweight Xray management tool focused on simple and reliable deployment.
 
 ```bash
 # Reality-only mode (no domain required)
-curl -sL https://github.com/Joe-oss9527/xray-fusion/raw/main/install.sh | bash -s -- --topology reality-only
+curl -sL https://github.com/xrf9268-hue/xray/raw/main/install.sh | bash -s -- --topology reality-only
 
 # Vision + Reality with auto certificates
-curl -sL https://github.com/Joe-oss9527/xray-fusion/raw/main/install.sh | bash -s -- \
+curl -sL https://github.com/xrf9268-hue/xray/raw/main/install.sh | bash -s -- \
   --topology vision-reality --domain your.domain.com --plugins cert-auto
 ```
 
 **Uninstall**:
 ```bash
-curl -sL https://github.com/Joe-oss9527/xray-fusion/raw/main/uninstall.sh | bash
+curl -sL https://github.com/xrf9268-hue/xray/raw/main/uninstall.sh | bash
 ```
 
 ## Installation
@@ -83,7 +83,7 @@ curl -sL install.sh | bash -s -- \
 
 ```bash
 # Clone repository
-git clone https://github.com/Joe-oss9527/xray-fusion.git
+git clone https://github.com/xrf9268-hue/xray.git
 cd xray-fusion
 
 # Install

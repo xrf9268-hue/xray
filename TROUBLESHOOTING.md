@@ -500,7 +500,7 @@ If you encounter issues not covered in this guide:
 
 1. **Check logs** with debug mode enabled: `XRF_DEBUG=true`
 2. **Review documentation**: AGENTS.md, CLAUDE.md, README.md
-3. **Search GitHub issues**: https://github.com/Joe-oss9527/xray-fusion/issues
+3. **Search GitHub issues**: https://github.com/xrf9268-hue/xray/issues
 4. **Create new issue** with:
    - Output of `bin/xrf status`
    - Relevant logs from `journalctl`

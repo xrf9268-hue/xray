@@ -133,7 +133,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Basic logging framework
 - Core utility functions (lib/core.sh)
 
-[Unreleased]: https://github.com/Joe-oss9527/xray-fusion/compare/v1.0.0...HEAD
-[1.0.0]: https://github.com/Joe-oss9527/xray-fusion/releases/tag/v1.0.0
-[0.9.0]: https://github.com/Joe-oss9527/xray-fusion/compare/v0.1.0...v0.9.0
-[0.1.0]: https://github.com/Joe-oss9527/xray-fusion/releases/tag/v0.1.0
+[Unreleased]: https://github.com/xrf9268-hue/xray/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/xrf9268-hue/xray/releases/tag/v1.0.0
+[0.9.0]: https://github.com/xrf9268-hue/xray/compare/v0.1.0...v0.9.0
+[0.1.0]: https://github.com/xrf9268-hue/xray/releases/tag/v0.1.0

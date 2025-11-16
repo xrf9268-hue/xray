@@ -37,7 +37,7 @@ Thank you for your interest in contributing to xray-fusion! This document provid
 
 ```bash
 # Clone the repository
-git clone https://github.com/Joe-oss9527/xray-fusion.git
+git clone https://github.com/xrf9268-hue/xray.git
 cd xray-fusion
 
 # Install development dependencies

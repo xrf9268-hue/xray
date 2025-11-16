@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # xray-fusion online uninstaller
-# Usage: curl -sL https://raw.githubusercontent.com/Joe-oss9527/xray-fusion/main/uninstall.sh | bash
+# Usage: curl -sL https://raw.githubusercontent.com/xrf9268-hue/xray/main/uninstall.sh | bash
 
 set -euo pipefail
 
@@ -12,7 +12,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Default values
-REPO_URL="${XRF_REPO_URL:-https://github.com/Joe-oss9527/xray-fusion.git}"
+REPO_URL="${XRF_REPO_URL:-https://github.com/xrf9268-hue/xray.git}"
 BRANCH="${XRF_BRANCH:-main}"
 INSTALL_DIR="${XRF_INSTALL_DIR:-/usr/local/xray-fusion}"
 
@@ -49,8 +49,8 @@ show_help() {
 xray-fusion online uninstaller
 
 Usage:
-  curl -sL https://raw.githubusercontent.com/Joe-oss9527/xray-fusion/main/uninstall.sh | bash
-  curl -sL https://raw.githubusercontent.com/Joe-oss9527/xray-fusion/main/uninstall.sh | bash -s -- [options]
+  curl -sL https://raw.githubusercontent.com/xrf9268-hue/xray/main/uninstall.sh | bash
+  curl -sL https://raw.githubusercontent.com/xrf9268-hue/xray/main/uninstall.sh | bash -s -- [options]
 
 Options:
   --keep-config                 Keep configuration files and state
@@ -61,16 +61,16 @@ Options:
 
 Examples:
   # Complete uninstallation
-  curl -sL https://raw.githubusercontent.com/Joe-oss9527/xray-fusion/main/uninstall.sh | bash
+  curl -sL https://raw.githubusercontent.com/xrf9268-hue/xray/main/uninstall.sh | bash
 
   # Keep configuration files
-  curl -sL https://raw.githubusercontent.com/Joe-oss9527/xray-fusion/main/uninstall.sh | bash -s -- --keep-config
+  curl -sL https://raw.githubusercontent.com/xrf9268-hue/xray/main/uninstall.sh | bash -s -- --keep-config
 
   # Force uninstallation without confirmation
-  curl -sL https://raw.githubusercontent.com/Joe-oss9527/xray-fusion/main/uninstall.sh | bash -s -- --force
+  curl -sL https://raw.githubusercontent.com/xrf9268-hue/xray/main/uninstall.sh | bash -s -- --force
 
 Environment Variables:
-  XRF_REPO_URL      Repository URL (default: https://github.com/Joe-oss9527/xray-fusion.git)
+  XRF_REPO_URL      Repository URL (default: https://github.com/xrf9268-hue/xray.git)
   XRF_BRANCH        Branch to use (default: main)
   XRF_INSTALL_DIR   Installation directory (default: /usr/local/xray-fusion)
 
