@@ -46,8 +46,8 @@ log_debug() { [[ "${DEBUG}" == "true" ]] && echo -e "${BLUE}[DEBUG]${NC} ${*}" |
 #   $3 - Step description
 #
 # Example:
-#   log_step 1 7 "检查运行环境"
-#   # Output: [1/7] 检查运行环境
+#   log_step 1 7 "Checking runtime environment"
+#   # Output: [1/7] Checking runtime environment
 ##
 log_step() {
   local current="${1}"
@@ -69,9 +69,9 @@ log_step() {
 #   $2 - Status icon (optional): •, ✓, ✗, or text aliases (success, error)
 #
 # Example:
-#   log_substep "ROOT 权限" "✓"
-#   log_substep "检查中..." "•"
-#   log_substep "失败" "error"
+#   log_substep "ROOT permission" "✓"
+#   log_substep "Checking..." "•"
+#   log_substep "Failed" "error"
 ##
 log_substep() {
   local desc="${1}"
@@ -101,7 +101,7 @@ log_substep() {
 #   DEBUG - If "true", spinner is not shown
 #
 # Example:
-#   show_spinner "正在下载..." &
+#   show_spinner "Downloading..." &
 #   SPINNER_PID=$!
 #   long_running_command
 #   kill ${SPINNER_PID} 2>/dev/null
@@ -148,27 +148,27 @@ retry_command() {
 
   while [[ ${attempt} -lt ${max_retries} ]]; do
     attempt=$((attempt + 1))
-    log_debug "尝试 ${attempt}/${max_retries}: $*"
+    log_debug "Attempt ${attempt}/${max_retries}: $*"
 
     if "$@"; then
-      log_debug "命令成功 (尝试 ${attempt})"
+      log_debug "Command succeeded (attempt ${attempt})"
       return 0
     fi
 
     if [[ ${attempt} -lt ${max_retries} ]]; then
-      log_warn "命令失败，${delay}秒后重试..."
+      log_warn "Command failed, retrying in ${delay}s..."
       sleep "${delay}"
       delay=$((delay * 2)) # Exponential backoff
     fi
   done
 
-  log_error "命令失败，已重试 ${max_retries} 次"
+  log_error "Command failed after ${max_retries} retries"
   return 1
 }
 
 # Check critical dependencies (embedded for early fail-fast)
 check_dependencies() {
-  log_info "检查核心依赖..."
+  log_info "Checking core dependencies..."
 
   local missing=()
 
@@ -177,29 +177,29 @@ check_dependencies() {
   for tool in git curl wget; do
     if command -v "${tool}" > /dev/null 2>&1; then
       has_downloader=true
-      log_debug "找到下载工具: ${tool}"
+      log_debug "Found download tool: ${tool}"
       break
     fi
   done
 
   if [[ "${has_downloader}" == "false" ]]; then
-    log_error "需要至少一个下载工具: git, curl, 或 wget"
-    missing+=("git 或 curl 或 wget")
+    log_error "Need at least one download tool: git, curl, or wget"
+    missing+=("git or curl or wget")
   fi
 
   # Check basic utilities
   for tool in mktemp tar gzip; do
     if ! command -v "${tool}" > /dev/null 2>&1; then
-      log_warn "缺少工具: ${tool}"
+      log_warn "Missing tool: ${tool}"
       missing+=("${tool}")
     fi
   done
 
   # Fail if any critical tool is missing
   if [[ ${#missing[@]} -gt 0 ]]; then
-    log_error "缺少关键依赖: ${missing[*]}"
+    log_error "Missing critical dependencies: ${missing[*]}"
     echo ""
-    echo "请根据您的系统安装缺少的工具："
+    echo "Please install missing tools for your system:"
     echo ""
     echo "# Debian/Ubuntu"
     echo "sudo apt-get update && sudo apt-get install -y git curl wget tar gzip"
@@ -222,10 +222,10 @@ check_dependencies() {
   done
 
   if [[ ${#optional_missing[@]} -gt 0 ]]; then
-    log_warn "可选工具缺失（功能可能受限）: ${optional_missing[*]}"
+    log_warn "Optional tools missing (functionality may be limited): ${optional_missing[*]}"
   fi
 
-  log_info "依赖检查通过"
+  log_info "Dependency check passed"
   return 0
 }
 
@@ -480,47 +480,47 @@ setup_environment() {
 # Early validation (inspired by 233boy style)
 early_checks() {
   # Check if running as root
-  [[ ${EUID} -ne 0 ]] && error_exit "当前非 ROOT用户，请使用 sudo 运行此脚本"
+  [[ ${EUID} -ne 0 ]] && error_exit "Not running as ROOT user, please run this script with sudo"
 
   # Check package manager (apt-get or yum)
   local cmd
   cmd=$(type -P apt-get || type -P yum || type -P dnf)
-  [[ -z "${cmd}" ]] && error_exit "此脚本仅支持 Ubuntu/Debian/CentOS/RHEL 系统"
+  [[ -z "${cmd}" ]] && error_exit "This script only supports Ubuntu/Debian/CentOS/RHEL systems"
 
   # Check systemd
   if ! type -P systemctl > /dev/null 2>&1; then
-    error_exit "此系统缺少 systemctl，请安装 systemd"
+    error_exit "This system is missing systemctl, please install systemd"
   fi
 
   # Check architecture (simplified)
   case $(uname -m) in
     x86_64 | amd64 | aarch64 | arm64) ;;
-    *) error_exit "此脚本仅支持 64 位系统" ;;
+    *) error_exit "This script only supports 64-bit systems" ;;
   esac
 
-  log_info "基础环境检查通过"
+  log_info "Basic environment check passed"
 }
 
 # System checks (simplified)
 check_system() {
-  log_info "检查系统要求..."
+  log_info "Checking system requirements..."
 
   # Basic OS detection without strict validation
   if [[ -f /etc/os-release ]]; then
     # Load in subshell to avoid variable pollution
     local os_info
     os_info=$(source /etc/os-release 2> /dev/null && echo "${ID:-unknown} ${VERSION_ID:-unknown}")
-    log_debug "检测到系统: ${os_info}"
+    log_debug "Detected system: ${os_info}"
   else
-    log_warn "无法检测操作系统版本，继续安装..."
+    log_warn "Unable to detect OS version, continuing with installation..."
   fi
 
-  log_info "系统检查完成"
+  log_info "System check completed"
 }
 
 # Install dependencies
 install_dependencies() {
-  log_info "安装依赖包..."
+  log_info "Installing dependencies..."
 
   local deps="curl wget git jq unzip openssl"
   local missing_deps=""
@@ -534,10 +534,10 @@ install_dependencies() {
   elif command -v dnf > /dev/null 2>&1; then
     pkg_manager="dnf"
   else
-    error_exit "未找到支持的包管理器 (apt/yum/dnf)"
+    error_exit "No supported package manager found (apt/yum/dnf)"
   fi
 
-  log_debug "检测到包管理器: ${pkg_manager}"
+  log_debug "Detected package manager: ${pkg_manager}"
 
   # Check for missing dependencies
   for dep in ${deps}; do
@@ -551,61 +551,61 @@ install_dependencies() {
 
   # Install missing dependencies
   if [[ -n "${missing_deps}" ]]; then
-    log_info "安装缺少的依赖包:${missing_deps}"
+    log_info "Installing missing dependencies: ${missing_deps}"
     case "${pkg_manager}" in
       apt)
-        apt-get update -qq || log_warn "apt-get update 失败，继续安装..."
+        apt-get update -qq || log_warn "apt-get update failed, continuing with installation..."
         # shellcheck disable=SC2086
-        apt-get install -y ${missing_deps} || error_exit "依赖包安装失败"
+        apt-get install -y ${missing_deps} || error_exit "Dependency installation failed"
         ;;
       yum)
-        yum install -y epel-release || log_warn "epel-release 安装失败，继续..."
+        yum install -y epel-release || log_warn "epel-release installation failed, continuing..."
         # shellcheck disable=SC2086
-        yum install -y ${missing_deps} || error_exit "依赖包安装失败"
+        yum install -y ${missing_deps} || error_exit "Dependency installation failed"
         ;;
       dnf)
         # shellcheck disable=SC2086
-        dnf install -y ${missing_deps} || error_exit "依赖包安装失败"
+        dnf install -y ${missing_deps} || error_exit "Dependency installation failed"
         ;;
       *)
-        error_exit "不支持的包管理器: ${pkg_manager}"
+        error_exit "Unsupported package manager: ${pkg_manager}"
         ;;
     esac
-    log_info "依赖包安装完成"
+    log_info "Dependency installation completed"
   else
-    log_info "所有依赖包已安装"
+    log_info "All dependencies already installed"
   fi
 }
 
 # Download xray-fusion
 download_project() {
-  log_info "从 ${REPO_URL} 下载 xray-fusion (分支: ${BRANCH})..."
+  log_info "Downloading xray-fusion from ${REPO_URL} (branch: ${BRANCH})..."
 
   TMP_DIR="$(mktemp -d)"
-  log_debug "使用临时目录: ${TMP_DIR}"
+  log_debug "Using temporary directory: ${TMP_DIR}"
 
   # Set proxy if specified
   if [[ -n "${PROXY}" ]]; then
     export https_proxy="${PROXY}"
     export http_proxy="${PROXY}"
-    log_info "使用代理: ${PROXY}"
+    log_info "Using proxy: ${PROXY}"
   fi
 
   # Download with automatic fallback (git → tarball)
-  log_debug "开始下载..."
+  log_debug "Starting download..."
 
   # Try git clone first (preferred) with retry
   local download_success=false
   if command -v git > /dev/null 2>&1; then
-    log_debug "尝试 git clone（最多重试 3 次）..."
+    log_debug "Attempting git clone (max 3 retries)..."
     if retry_command 3 2 git clone --depth 1 --branch "${BRANCH}" "${REPO_URL}" "${TMP_DIR}/xray-fusion"; then
-      log_debug "git clone 成功"
+      log_debug "git clone succeeded"
       download_success=true
     else
-      log_warn "git clone 失败，尝试 tarball 下载..."
+      log_warn "git clone failed, trying tarball download..."
     fi
   else
-    log_debug "git 不可用，使用 tarball 下载"
+    log_debug "git not available, using tarball download"
   fi
 
   # Fallback to tarball if git failed
@@ -613,15 +613,15 @@ download_project() {
     local tarball_url="${REPO_URL%.git}/archive/refs/heads/${BRANCH}.tar.gz"
     local tarball="${TMP_DIR}/archive.tar.gz"
 
-    log_debug "下载 tarball: ${tarball_url}"
+    log_debug "Downloading tarball: ${tarball_url}"
 
     # Try curl first with retry
     if command -v curl > /dev/null 2>&1; then
       if retry_command 3 2 curl -fsSL --connect-timeout 10 --max-time 300 "${tarball_url}" -o "${tarball}"; then
-        log_debug "tarball 下载成功 (curl)"
+        log_debug "tarball download succeeded (curl)"
         download_success=true
       else
-        log_warn "curl 下载失败（已重试）"
+        log_warn "curl download failed (after retries)"
         rm -f "${tarball}"
       fi
     fi
@@ -629,24 +629,24 @@ download_project() {
     # Fallback to wget with retry
     if [[ "${download_success}" == "false" ]] && command -v wget > /dev/null 2>&1; then
       if retry_command 3 2 wget -q --timeout=10 "${tarball_url}" -O "${tarball}"; then
-        log_debug "tarball 下载成功 (wget)"
+        log_debug "tarball download succeeded (wget)"
         download_success=true
       else
-        log_warn "wget 下载失败（已重试）"
+        log_warn "wget download failed (after retries)"
         rm -f "${tarball}"
       fi
     fi
 
     # Extract tarball if downloaded
     if [[ "${download_success}" == "true" ]]; then
-      log_debug "解压 tarball..."
+      log_debug "Extracting tarball..."
       if tar -xzf "${tarball}" -C "${TMP_DIR}" 2> /dev/null; then
         # Rename extracted directory
         mv "${TMP_DIR}/xray-fusion-${BRANCH}" "${TMP_DIR}/xray-fusion" 2> /dev/null \
           || mv "${TMP_DIR}"/xray-fusion-* "${TMP_DIR}/xray-fusion" 2> /dev/null
         rm -f "${tarball}"
       else
-        log_error "tarball 解压失败"
+        log_error "tarball extraction failed"
         rm -f "${tarball}"
         download_success=false
       fi
@@ -655,9 +655,9 @@ download_project() {
 
   # Check final result
   if [[ "${download_success}" == "false" ]]; then
-    log_error "所有下载方式均失败 (git/curl/wget)"
-    log_info "请检查网络连接或尝试使用代理"
-    error_exit "下载失败"
+    log_error "All download methods failed (git/curl/wget)"
+    log_info "Please check your network connection or try using a proxy"
+    error_exit "Download failed"
   fi
 
   # === Verify download integrity BEFORE sourcing any code ===
@@ -703,10 +703,10 @@ download_project() {
 
   # Verify download completeness
   if [[ ! -d "${TMP_DIR}/xray-fusion" ]] || [[ ! -f "${TMP_DIR}/xray-fusion/bin/xrf" ]]; then
-    error_exit "下载的文件不完整或损坏"
+    error_exit "Downloaded files incomplete or corrupted"
   fi
 
-  log_info "下载完成"
+  log_info "Download completed"
 }
 
 # Install xray-fusion
@@ -880,44 +880,44 @@ EOF
   parse_args "${@}"
 
   # === Step 1: Dependency check (fail-fast) ===
-  log_step 1 7 "检查核心依赖"
-  check_dependencies || error_exit "依赖检查失败，无法继续安装"
-  log_substep "下载工具可用" "✓"
-  log_substep "系统工具就绪" "✓"
+  log_step 1 7 "Checking core dependencies"
+  check_dependencies || error_exit "Dependency check failed, cannot continue installation"
+  log_substep "Download tools available" "✓"
+  log_substep "System tools ready" "✓"
 
   # === Step 2: Environment checks ===
-  log_step 2 7 "检查运行环境"
+  log_step 2 7 "Checking runtime environment"
   early_checks
-  log_substep "ROOT 权限" "✓"
-  log_substep "systemd 可用" "✓"
-  log_substep "架构支持 ($(uname -m))" "✓"
+  log_substep "ROOT permission" "✓"
+  log_substep "systemd available" "✓"
+  log_substep "Architecture supported ($(uname -m))" "✓"
 
   # Setup environment from parsed arguments
   setup_environment
 
   # === Step 3: Configuration validation ===
-  log_step 3 7 "验证配置参数"
-  log_substep "拓扑: ${TOPOLOGY}" "✓"
-  [[ -n "${DOMAIN}" ]] && log_substep "域名: ${DOMAIN}" "✓"
-  log_substep "版本: ${VERSION}" "✓"
+  log_step 3 7 "Validating configuration parameters"
+  log_substep "Topology: ${TOPOLOGY}" "✓"
+  [[ -n "${DOMAIN}" ]] && log_substep "Domain: ${DOMAIN}" "✓"
+  log_substep "Version: ${VERSION}" "✓"
 
   # === Step 4: System compatibility check ===
-  log_step 4 7 "检查系统兼容性"
+  log_step 4 7 "Checking system compatibility"
   check_system
-  log_substep "操作系统兼容" "✓"
+  log_substep "Operating system compatible" "✓"
 
   # === Step 5: Install system dependencies ===
-  log_step 5 7 "安装必需依赖包"
+  log_step 5 7 "Installing required dependencies"
   install_dependencies
 
   # === Step 6: Download project ===
-  log_step 6 7 "下载 xray-fusion"
-  log_substep "仓库: ${REPO_URL##*/}"
-  log_substep "分支: ${BRANCH}"
+  log_step 6 7 "Downloading xray-fusion"
+  log_substep "Repository: ${REPO_URL##*/}"
+  log_substep "Branch: ${BRANCH}"
 
   # Show spinner during download (skip in debug mode)
   if [[ "${DEBUG}" != "true" ]]; then
-    show_spinner "正在下载..." &
+    show_spinner "Downloading..." &
     SPINNER_PID=$!
   fi
 
@@ -931,21 +931,21 @@ EOF
     unset SPINNER_PID
   fi
 
-  log_substep "下载完成" "✓"
+  log_substep "Download completed" "✓"
 
   # === Step 7: Install and configure ===
-  log_step 7 7 "安装并配置 Xray"
+  log_step 7 7 "Installing and configuring Xray"
   install_xray_fusion
-  log_substep "文件安装完成" "✓"
+  log_substep "File installation completed" "✓"
 
   run_xray_install
-  log_substep "服务启动成功" "✓"
+  log_substep "Service started successfully" "✓"
 
   echo ""
   show_summary
 
   echo ""
-  log_info "🎉 安装完成！"
+  log_info "🎉 Installation completed!"
 }
 
 # Run main function with all arguments

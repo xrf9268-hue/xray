@@ -79,27 +79,27 @@ EOF
 
 # Check if xray-fusion is installed
 check_installation() {
-  log_info "检查 xray-fusion 安装状态..."
+  log_info "Checking xray-fusion installation status..."
 
   # Check if xrf command exists or installation directory exists
   if ! command -v xrf > /dev/null 2>&1 && [[ ! -d "${INSTALL_DIR}" ]]; then
-    log_warn "xray-fusion 未安装或未在预期位置找到"
+    log_warn "xray-fusion not installed or not found at expected location"
     if [[ "${FORCE}" != "true" ]]; then
       # Improved non-interactive detection
       if [[ -t 0 && -t 1 ]]; then
-        read -p "仍要继续卸载? [y/N]: " -r
+        read -p "Still want to continue uninstallation? [y/N]: " -r
         if [[ ! ${REPLY} =~ ^[Yy]$ ]]; then
-          log_info "卸载已取消"
+          log_info "Uninstallation cancelled"
           exit 0
         fi
       else
-        log_warn "非交互模式检测到，使用 --force 参数强制卸载"
+        log_warn "Non-interactive mode detected, use --force parameter to force uninstallation"
         return 1
       fi
     fi
   fi
 
-  log_info "发现 xray-fusion 安装"
+  log_info "Found xray-fusion installation"
   return 0
 }
 
@@ -151,22 +151,22 @@ get_installation_info() {
 # Confirm uninstallation
 confirm_uninstallation() {
   if [[ "${FORCE}" == "true" ]]; then
-    log_info "强制模式已启用，跳过确认"
+    log_info "Force mode enabled, skipping confirmation"
     return 0
   fi
 
-  log_warn "这将完全从系统中移除 xray-fusion 和 Xray！"
-  [[ "${KEEP_CONFIG}" == "true" ]] && log_info "配置文件将被保留"
+  log_warn "This will completely remove xray-fusion and Xray from your system!"
+  [[ "${KEEP_CONFIG}" == "true" ]] && log_info "Configuration files will be preserved"
 
   # Improved interactive check
   if [[ -t 0 && -t 1 ]]; then
-    read -p "确定要继续吗? [y/N]: " -r
+    read -p "Are you sure you want to continue? [y/N]: " -r
     if [[ ! ${REPLY} =~ ^[Yy]$ ]]; then
-      log_info "卸载已取消"
+      log_info "Uninstallation cancelled"
       exit 0
     fi
   else
-    log_info "非交互模式检测到，自动继续卸载..."
+    log_info "Non-interactive mode detected, continuing with uninstallation..."
   fi
 }
 
@@ -254,7 +254,7 @@ run_xrf_uninstall() {
 
 # Clean up symlinks
 cleanup_symlinks() {
-  log_info "清理符号链接..."
+  log_info "Cleaning up symlinks..."
   local cleanup_count=0
 
   # Clean up xrf symlinks
@@ -265,57 +265,57 @@ cleanup_symlinks() {
       # Remove if target contains xray-fusion or if target doesn't exist
       if [[ "${target}" == *"xray-fusion"* ]] || [[ ! -e "${target}" ]]; then
         rm -f "${link_path}" && ((cleanup_count++))
-        log_debug "已删除符号链接: ${link_path}"
+        log_debug "Removed symlink: ${link_path}"
       fi
     fi
   done
 
-  [[ ${cleanup_count} -gt 0 ]] && log_info "已清理 ${cleanup_count} 个符号链接"
+  [[ ${cleanup_count} -gt 0 ]] && log_info "Cleaned up ${cleanup_count} symlinks"
 }
 
 # Manual cleanup
 manual_cleanup() {
-  log_info "执行手动清理..."
+  log_info "Performing manual cleanup..."
 
   local cleanup_count=0
 
   # Remove global xrf symlink
   if [[ -L /usr/local/bin/xrf ]]; then
     rm -f /usr/local/bin/xrf && ((cleanup_count++))
-    log_debug "已删除 /usr/local/bin/xrf"
+    log_debug "Removed /usr/local/bin/xrf"
   fi
 
   # Remove Xray binary
   if [[ -f /usr/local/bin/xray ]]; then
     rm -f /usr/local/bin/xray && ((cleanup_count++))
-    log_debug "已删除 /usr/local/bin/xray"
+    log_debug "Removed /usr/local/bin/xray"
   fi
 
   # Remove Xray configuration (unless keeping config)
   if [[ "${KEEP_CONFIG}" != "true" ]]; then
     if [[ -d /usr/local/etc/xray ]]; then
       rm -rf /usr/local/etc/xray && ((cleanup_count++))
-      log_debug "已删除 /usr/local/etc/xray"
+      log_debug "Removed /usr/local/etc/xray"
     fi
   else
-    log_info "保留 Xray 配置文件"
+    log_info "Preserving Xray configuration files"
   fi
 
   # Remove log directory
   if [[ -d /var/log/xray ]]; then
     rm -rf /var/log/xray && ((cleanup_count++))
-    log_debug "已删除 /var/log/xray"
+    log_debug "Removed /var/log/xray"
   fi
 
   # Remove logrotate configuration
   if [[ -f /etc/logrotate.d/xray-fusion ]]; then
     rm -f /etc/logrotate.d/xray-fusion && ((cleanup_count++))
-    log_debug "已删除 logrotate 配置"
+    log_debug "Removed logrotate configuration"
   fi
 
   # Note: Symlinks are handled by cleanup_symlinks() function
 
-  log_info "手动清理完成，清理了 ${cleanup_count} 个项目"
+  log_info "Manual cleanup completed, cleaned up ${cleanup_count} items"
 }
 
 # Remove installation directory
@@ -399,11 +399,11 @@ main() {
  ╚═╝  ╚═╝╚═╝  ╚═╝╚═╝  ╚═╝   ╚═╝         ╚═╝      ╚═════╝ ╚══════╝╚═╝ ╚═════╝ ╚═╝  ╚═══╝
 EOF
   echo -e "${NC}"
-  echo "                    Xray Fusion - 卸载工具"
+  echo "                    Xray Fusion - Uninstaller"
   echo ""
 
   # Check if running as root (233boy style)
-  [[ ${EUID} -ne 0 ]] && error_exit "当前非 ROOT用户，请使用 sudo 运行此脚本"
+  [[ ${EUID} -ne 0 ]] && error_exit "Not running as ROOT user, please run this script with sudo"
 
   parse_args "${@}"
 

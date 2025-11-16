@@ -616,7 +616,7 @@ io::atomic_write() {
 - ✅ **Hidden prefix**: `.atomic-write.` avoids naming conflicts
 - ✅ **Explicit error handling**: Cleanup on each failure path
 - ✅ **No trap interference**: Works correctly in pipelines and test frameworks
-- ✅ **Race condition防护**: Prevents TOCTOU attacks (CWE-362)
+- ✅ **Race condition protection**: Prevents TOCTOU attacks (CWE-362)
 
 **References**:
 - [CWE-362: Concurrent Execution using Shared Resource](https://cwe.mitre.org/data/definitions/362.html)
