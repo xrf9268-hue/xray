@@ -15,7 +15,7 @@ Hooks are defined in `.claude/settings.json` following the [official documentati
   "hooks": {
     "SessionStart": [
       {
-        "matcher": "*",
+        "matcher": "startup",
         "hooks": [
           {
             "type": "command",
@@ -28,6 +28,8 @@ Hooks are defined in `.claude/settings.json` following the [official documentati
 }
 ```
 
+The `"matcher": "startup"` ensures the hook only runs on new session initialization, not on resume/clear/compact events.
+
 ### What it Does
 
 The SessionStart hook automatically installs development tools in **web/iOS environments only**:
@@ -36,11 +38,11 @@ The SessionStart hook automatically installs development tools in **web/iOS envi
 - **shellcheck v0.10.0** - Shell script linter
 - **bats-core v1.11.0** - Bash Automated Testing System
 
-**Invocation Source Detection** (Optimized):
-- **startup**: First-time session initialization → **Auto-install tools**
-- **resume**: Resume from `/resume` or `--resume` → **Skip installation** (tools already available)
-- **clear**: After `/clear` command → **Skip installation** (tools already available)
-- **compact**: Auto/manual compaction → **Skip installation** (tools already available)
+**Matcher-Based Triggering**:
+- **startup**: New session initialization → **Hook runs** (auto-install tools)
+- **resume**: Resume from `/resume` or `--resume` → **Hook does NOT run**
+- **clear**: After `/clear` command → **Hook does NOT run**
+- **compact**: Auto/manual compaction → **Hook does NOT run**
 
 **Environment Detection**:
 - **Web/iOS** (`CLAUDE_CODE_REMOTE=true`): Auto-install tools to `~/.local/bin/`
@@ -99,19 +101,18 @@ Test the hook script manually:
 When you start a new Claude Code session:
 
 1. Claude Code reads `.claude/settings.json` (and `.claude/settings.local.json` if exists)
-2. SessionStart hooks are triggered automatically
-3. **The hook script detects invocation source** from JSON input (stdin)
-4. **If `source == "startup"`**: Install missing tools to `~/.local/bin/`
-5. **If `source != "startup"`**: Skip installation (tools already available from initial startup)
-6. Tools are ready for `make fmt`, `make lint`, etc.
+2. **Only on `startup` events**: SessionStart hook is triggered (matcher: `"startup"`)
+3. **On `resume/clear/compact` events**: Hook does NOT run (filtered by matcher)
+4. Hook script installs missing tools to `~/.local/bin/` (web/iOS only)
+5. Tools are ready for `make fmt`, `make lint`, etc.
 
 ### Optimization Benefits
 
-**Performance**: Installation tasks only run once at first startup, not on every session resume/clear/compact.
+**Performance**: Matcher-based filtering ensures installation tasks only run once at first startup, not on every session resume/clear/compact.
 
 **Reliability**: Existing tools remain available across session operations without redundant reinstallation.
 
-**Backward Compatibility**: Falls back to `startup` behavior if JSON input is unavailable (e.g., older Claude Code versions).
+**Simplicity**: No need for complex JSON parsing logic - Claude Code's matcher system handles event filtering natively.
 
 ### Notes
 

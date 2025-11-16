@@ -5,11 +5,9 @@
 # This hook runs automatically when a Claude Code session starts.
 # It ensures development tools (shfmt, shellcheck, bats-core) are available.
 #
-# Invocation Sources:
-# - startup: New session (performs full installation)
-# - resume: Resume/continue session (skips installation)
-# - clear: Clear command (skips installation)
-# - compact: Compaction operation (skips installation)
+# Trigger: Only on 'startup' events (matcher configured in .claude/settings.json)
+# - startup: New session initialization (this hook runs)
+# - resume/clear/compact: Other events (this hook does NOT run)
 #
 # Environment Detection:
 # - CLAUDE_CODE_REMOTE=true: Web/iOS environment (auto-install tools)
@@ -18,43 +16,7 @@
 
 set -euo pipefail
 
-# Parse hook input JSON to detect invocation source
-# Input format: {"source": "startup"|"resume"|"clear"|"compact", ...}
-detect_invocation_source() {
-  local input=""
-
-  # Read stdin if available (timeout after 0.1s)
-  if read -t 0.1 -r input && [[ -n "${input}" ]]; then
-    # Try jq if available
-    if command -v jq > /dev/null 2>&1; then
-      local source
-      source=$(echo "${input}" | jq -r '.source // "unknown"' 2> /dev/null || echo "unknown")
-      if [[ -n "${source}" && "${source}" != "unknown" ]]; then
-        echo "${source}"
-        return 0
-      fi
-    fi
-
-    # Fallback: basic bash JSON parsing
-    if [[ "${input}" =~ \"source\"[[:space:]]*:[[:space:]]*\"([^\"]+)\" ]]; then
-      echo "${BASH_REMATCH[1]}"
-      return 0
-    fi
-  fi
-
-  # Default to startup if stdin is not available or parsing failed (backward compatibility)
-  echo "startup"
-}
-
-SOURCE="$(detect_invocation_source)"
-
-# Skip installation for non-startup invocations
-if [[ "${SOURCE}" != "startup" ]]; then
-  echo "[SessionStart] Invoked from '${SOURCE}', skipping installation (tools already available)" >&2
-  exit 0
-fi
-
-echo "[SessionStart] Invoked from 'startup', initializing environment..." >&2
+echo "[SessionStart] Initializing environment..." >&2
 
 # Detect if running in Claude Code web/iOS environment
 is_remote_environment() {
