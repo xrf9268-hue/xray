@@ -616,7 +616,7 @@ io::atomic_write() {
 - ✅ **Hidden prefix**: `.atomic-write.` avoids naming conflicts
 - ✅ **Explicit error handling**: Cleanup on each failure path
 - ✅ **No trap interference**: Works correctly in pipelines and test frameworks
-- ✅ **Race condition防护**: Prevents TOCTOU attacks (CWE-362)
+- ✅ **Race condition protection**: Prevents TOCTOU attacks (CWE-362)
 
 **References**:
 - [CWE-362: Concurrent Execution using Shared Resource](https://cwe.mitre.org/data/definitions/362.html)
@@ -673,9 +673,15 @@ exec 200>> "${lock}"  # Now succeeds for all users
 
 When integrating with external tools (e.g., Xray, Docker, systemd), their output format may change between versions. Always design parsers to be robust and backward-compatible.
 
-**⚠️ Real-World Case: Xray x25519 Format Change**
+**⚠️ Real-World Case: Xray x25519 Format Change (PR #2)**
 
-Xray-core changed x25519 output format in v25.8.31+ (2024):
+**The Problem**: Installation failures started occurring with Xray v25.10.15, producing "failed to parse x25519 keypair" errors. Investigation revealed that Xray-core changed the x25519 output format in v25.8.31+ (2024), but the change went undetected until users upgraded to newer versions.
+
+**Impact**: Complete installation failure for users running Xray v25.8.31+ (approximately 1+ year of releases).
+
+**Root Cause**: The original parser used exact string matching for "Private key:" and "Public key:" labels, which broke when Xray changed to "PrivateKey:" and "Password:" labels.
+
+**Format Changes**:
 ```bash
 # Old format (pre-v25.8.31)
 Private key: <base64-value>
@@ -788,7 +794,9 @@ x25519::parse_keys() {
 - ❌ Not testing with multiple tool versions
 - ❌ Ignoring upstream release notes
 
-**Reference**: Fixed in commit dfbce58 (2025-11-16) - lib/x25519.sh parser upgrade for Xray v25.8.31+ compatibility
+**Resolution**: Fixed in commit dfbce58 via PR #2 (2025-11-16) - lib/x25519.sh parser upgrade for Xray v25.8.31+ compatibility. The fix implements normalized label matching that handles both old and new formats, preventing future breakage.
+
+**Key Lesson**: Silent format changes in upstream tools can cause production failures months/years later. Robust parsing with normalization and multi-version support is essential for production reliability.
 
 ## Testing Guidelines
 - Test framework: bats-core with 119 unit tests across 5 test files.

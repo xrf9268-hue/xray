@@ -1,208 +1,208 @@
 # Project Memory: xray-fusion
 
-> 本文档记录项目关键架构决策和核心教训。详细的编码规范、开发工作流和技术细节请参见 [@AGENTS.md](./AGENTS.md)。
+> This document records key architectural decisions and core lessons learned. For detailed coding standards, development workflows, and technical details, see [@AGENTS.md](./AGENTS.md).
 
-## ⚠️ 强制开发规范
+## ⚠️ Mandatory Development Standards
 
-### 提交前质量检查（强制要求）
+### Pre-Commit Quality Checks (Mandatory)
 
-**所有代码提交必须满足以下条件，无例外**：
+**All code commits must meet the following conditions, no exceptions**:
 
 ```bash
-# 必须全部通过才能提交
-make fmt           # 代码格式化（shfmt）
-make lint          # 静态检查（shellcheck）
-make test-unit     # 单元测试（bats）
+# All must pass before committing
+make fmt           # Code formatting (shfmt)
+make lint          # Static analysis (shellcheck)
+make test-unit     # Unit tests (bats)
 ```
 
-**不允许提交**：
-- ❌ 格式不符合规范的代码
-- ❌ 有 ShellCheck 错误/警告的代码
-- ❌ 测试失败的代码
-- ❌ 未经测试的新功能
+**Not allowed to commit**:
+- ❌ Code that doesn't conform to formatting standards
+- ❌ Code with ShellCheck errors/warnings
+- ❌ Code with failing tests
+- ❌ Untested new features
 
-### 推荐开发流程（TDD）
+### Recommended Development Workflow (TDD)
 
-默认采用测试驱动开发（Test-Driven Development）模式：
+Adopt Test-Driven Development (TDD) mode by default:
 
 ```
-1. Write tests, commit    # 先写测试，提交测试
-2. Code, iterate, commit   # 写代码，迭代直到通过，提交代码
+1. Write tests, commit    # Write tests first, commit tests
+2. Code, iterate, commit   # Write code, iterate until passing, commit code
 ```
 
-**核心原则**（参考 [Anthropic Claude Code Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)）：
-- 先编写测试，明确期望的输入/输出
-- 验证测试失败（确保测试有效）
-- 实现功能，迭代直到测试通过
-- 提交前运行完整检查：`make fmt && make lint && make test-unit`
+**Core Principles** (Reference: [Anthropic Claude Code Best Practices](https://www.anthropic.com/engineering/claude-code-best-practices)):
+- Write tests first, clarify expected inputs/outputs
+- Verify test failures (ensure tests are valid)
+- Implement features, iterate until tests pass
+- Run complete checks before committing: `make fmt && make lint && make test-unit`
 
-**优势**：
-- 清晰的迭代目标（测试用例）
-- 增量式改进，有明确验证标准
-- 高测试覆盖率，减少回归错误
-
----
-
-## 架构决策记录 (ADR)
-
-### ADR-001: 统一参数传递系统（2025-09-XX）
-**问题**: install.sh 和 xrf 使用不同参数格式，环境变量在管道中无效
-
-**决策**: 彻底统一为命令行参数，移除环境变量混合模式
-
-**理由**:
-- 管道友好：`curl | bash -s -- --domain x.com` 正常工作
-- 零维护负担：单一参数定义点，无兼容性包袱
-- 接口一致：不同入口使用相同参数
+**Advantages**:
+- Clear iteration goals (test cases)
+- Incremental improvements with clear validation criteria
+- High test coverage, reduced regression errors
 
 ---
 
-### ADR-002: 证书同步从 Path 单元改为 Timer（2025-10-05）
-**问题**: systemd Path 单元在嵌套目录、NFS 等场景不可靠
+## Architecture Decision Records (ADR)
 
-**决策**: 使用 Timer 每 10 分钟检查证书变更
+### ADR-001: Unified Parameter Passing System (2025-09-XX)
+**Problem**: install.sh and xrf use different parameter formats, environment variables don't work in pipes
 
-**理由**:
-- 更可靠：避免 inotify 文件系统兼容性问题
-- 足够及时：证书通常 60-90 天才更新，10 分钟检查足够
-- 易于测试：可预测的执行时间
+**Decision**: Completely unify to command-line parameters, remove mixed environment variable mode
 
----
-
-### ADR-003: Xray 证书更新使用 restart 而非 reload（2025-10-05）
-**问题**: Xray-core 不支持 SIGHUP 优雅重载
-
-**决策**: 证书更新后使用 `systemctl restart xray`
-
-**理由**:
-- 官方确认：GitHub Discussion #1060 明确不支持
-- 避免未定义行为：SIGHUP 可能导致进程异常终止
-- 官方参考：XTLS/Xray-install 脚本无 ExecReload
+**Rationale**:
+- Pipe-friendly: `curl | bash -s -- --domain x.com` works normally
+- Zero maintenance burden: Single parameter definition point, no compatibility baggage
+- Interface consistency: Different entry points use the same parameters
 
 ---
 
-### ADR-004: 证书验证支持 ECDSA（2025-10-05）
-**问题**: 原实现仅验证 RSA 证书，现代 CA 越来越多使用 ECDSA
+### ADR-002: Certificate Sync from Path Unit to Timer (2025-10-05)
+**Problem**: systemd Path units are unreliable in nested directories, NFS, and other scenarios
 
-**决策**: 使用公钥哈希比对，支持 RSA 和 ECDSA
+**Decision**: Use Timer to check certificate changes every 10 minutes
 
-**理由**:
-- 通用方法：`openssl pkey` 处理所有密钥类型
-- 面向未来：ECDSA 性能更好、体积更小
-- 算法无关：SHA256 哈希比对不依赖特定算法
-
----
-
-### ADR-005: 移除 OCSP Stapling（2025-10-06）
-**问题**: Let's Encrypt 于 2025-01-30 停止 OCSP 服务
-
-**决策**: 从 TLS 配置中删除 `ocspStapling` 参数
-
-**理由**:
-- Let's Encrypt 官方公告停止 OCSP Must-Staple 支持
-- 保留无效参数增加维护负担
-- 替代方案（CRLite）由浏览器自动处理，无需服务端配置
+**Rationale**:
+- More reliable: Avoids inotify filesystem compatibility issues
+- Timely enough: Certificates typically update every 60-90 days, 10-minute checks are sufficient
+- Easy to test: Predictable execution time
 
 ---
 
-### ADR-006: 证书同步并发锁（2025-10-06）
-**问题**: systemd timer 可能并发触发证书同步脚本
+### ADR-003: Xray Certificate Update Uses restart Instead of reload (2025-10-05)
+**Problem**: Xray-core doesn't support SIGHUP graceful reload
 
-**决策**: 使用 flock 非阻塞锁保护证书同步
+**Decision**: Use `systemctl restart xray` after certificate updates
 
-**理由**:
-- 防止竞态条件导致证书损坏或不一致
-- 非阻塞模式避免任务堆积，第二个实例立即退出
-- 符合项目已有 `core::with_flock` 模式
-
----
-
-### ADR-007: 强制配置验证（2025-10-06）
-**问题**: `XRF_SKIP_XRAY_TEST` 环境变量可能被滥用跳过验证
-
-**决策**: 完全删除配置测试跳过功能
-
-**理由**:
-- 配置验证是关键安全检查，不应可绕过
-- 简化代码逻辑，减少维护负担（删除 21 行冗余代码）
-- 符合"代码整洁优于兼容性"原则
+**Rationale**:
+- Official confirmation: GitHub Discussion #1060 explicitly states no support
+- Avoid undefined behavior: SIGHUP may cause abnormal process termination
+- Official reference: XTLS/Xray-install scripts have no ExecReload
 
 ---
 
-### ADR-008: 证书同步脚本独立化（2025-11-09）
-**问题**: `modules/web/caddy.sh` 包含 195 行嵌入式 HERE 文档（证书同步脚本）
+### ADR-004: Certificate Validation Supports ECDSA (2025-10-05)
+**Problem**: Original implementation only validates RSA certificates, modern CAs increasingly use ECDSA
 
-**决策**: 提取为独立脚本 `scripts/caddy-cert-sync.sh`
+**Decision**: Use public key hash comparison, support both RSA and ECDSA
 
-**理由**:
-- 可维护性：独立脚本更易于测试、调试和版本控制
-- 代码复杂度：消除大型 HERE 文档，caddy.sh 从 444 行减至 259 行（-41.7%）
-- 单一职责：证书同步是独立功能，应该是独立模块
-- 可测试性：独立脚本可以单独测试，无需启动整个安装流程
-
-**影响**:
-- 文件结构更清晰
-- 便于 code review
-- 支持独立执行和调试
+**Rationale**:
+- Universal method: `openssl pkey` handles all key types
+- Future-oriented: ECDSA has better performance and smaller size
+- Algorithm-agnostic: SHA256 hash comparison doesn't depend on specific algorithms
 
 ---
 
-### ADR-009: 引入自动化测试框架（2025-11-09）
-**问题**: 项目缺少自动化测试，完全依赖人工测试和静态分析
+### ADR-005: Remove OCSP Stapling (2025-10-06)
+**Problem**: Let's Encrypt stopped OCSP service on 2025-01-30
 
-**决策**: 基于 bats-core 建立测试框架和 CI/CD 流水线
+**Decision**: Remove `ocspStapling` parameter from TLS configuration
 
-**实现**:
-- 测试框架：bats-core + 自定义测试辅助函数
-- 单元测试：96 个测试用例覆盖核心模块（5 个测试文件）
-- CI/CD：GitHub Actions 6 个工作流（Lint, Format, Test, Security）
-- Makefile：统一的测试命令 (`make test`, `make test-unit`)
-
-**理由**:
-- 质量保证：自动化测试防止回归错误
-- 快速反馈：CI/CD 在每次提交时自动运行测试
-- 文档化：测试用例是最好的使用文档
-- 持续改进：测试覆盖率可以持续提升
-
-**测试覆盖**:
-- lib/args.sh: 100% (21 个测试)
-- lib/core.sh: ~85% (8 个测试)
-- lib/plugins.sh: ~90% (26 个测试)
-- modules/io.sh: ~95% (21 个测试)
-- services/xray/common.sh: 100% (20 个测试)
-- **总计**: 96 个测试用例，~80% 代码覆盖率
+**Rationale**:
+- Let's Encrypt official announcement to stop OCSP Must-Staple support
+- Keeping invalid parameters increases maintenance burden
+- Alternative solution (CRLite) is automatically handled by browsers, no server-side configuration needed
 
 ---
 
-### ADR-010: Phase 1 安全增强（2025-11-10）
-**问题**: Code review 发现三个高优先级安全/稳定性问题
+### ADR-006: Certificate Sync Concurrency Lock (2025-10-06)
+**Problem**: systemd timer may trigger certificate sync script concurrently
 
-**决策**: 实施 Phase 1 安全修复：域名验证增强、shortId 生成统一、锁文件管理改进
+**Decision**: Use flock non-blocking lock to protect certificate sync
 
-**实施**:
-1. **域名验证增强** (lib/validators.sh)
-   - 新增 RFC 3927 链路本地地址检测 (169.254.0.0/16)
-   - 新增 RFC 6761 特殊用途域名检测 (.test, .invalid)
-   - 新增 IPv6 私有地址检测 (::1, fc00::/7, fe80::/10)
-   - 新增 9 个单元测试
+**Rationale**:
+- Prevent race conditions that cause certificate corruption or inconsistency
+- Non-blocking mode avoids task pileup, second instance exits immediately
+- Consistent with project's existing `core::with_flock` pattern
 
-2. **shortId 生成统一** (commands/install.sh)
-   - 使用可靠的工具链: xxd → od → openssl
-   - 修复 hexdump 格式字符串错误
-   - 保证所有方法生成 16 字符十六进制字符串
+---
 
-3. **锁文件管理改进** (scripts/caddy-cert-sync.sh)
-   - 迁移锁文件位置: /var/lock → /var/lib/xray-fusion/locks/
-   - 使用 install(1) 原子创建（防止 TOCTOU - CWE-362）
-   - 处理混合 sudo/非sudo 运行场景（防止 CWE-283）
+### ADR-007: Mandatory Configuration Validation (2025-10-06)
+**Problem**: `XRF_SKIP_XRAY_TEST` environment variable may be abused to skip validation
 
-**理由**:
-- 安全性：关闭已知验证漏洞（IPv6、保留域名）
-- 可靠性：统一 shortId 生成避免长度不一致
-- 稳定性：锁文件管理支持混合权限运行环境
-- 标准化：遵循 RFC 规范和 systemd 最佳实践
+**Decision**: Completely remove configuration test skip functionality
 
-**参考文档**:
+**Rationale**:
+- Configuration validation is a critical security check, should not be bypassable
+- Simplify code logic, reduce maintenance burden (removed 21 lines of redundant code)
+- Consistent with "clean code over compatibility" principle
+
+---
+
+### ADR-008: Certificate Sync Script Independence (2025-11-09)
+**Problem**: `modules/web/caddy.sh` contains 195-line embedded HERE document (certificate sync script)
+
+**Decision**: Extract as independent script `scripts/caddy-cert-sync.sh`
+
+**Rationale**:
+- Maintainability: Independent scripts are easier to test, debug, and version control
+- Code complexity: Eliminated large HERE document, caddy.sh reduced from 444 to 259 lines (-41.7%)
+- Single responsibility: Certificate sync is an independent function, should be an independent module
+- Testability: Independent scripts can be tested separately without starting the entire installation process
+
+**Impact**:
+- Clearer file structure
+- Easier code review
+- Supports independent execution and debugging
+
+---
+
+### ADR-009: Introduce Automated Testing Framework (2025-11-09)
+**Problem**: Project lacks automated testing, completely relies on manual testing and static analysis
+
+**Decision**: Establish testing framework and CI/CD pipeline based on bats-core
+
+**Implementation**:
+- Test framework: bats-core + custom test helper functions
+- Unit tests: 96 test cases covering core modules (5 test files)
+- CI/CD: GitHub Actions 6 workflows (Lint, Format, Test, Security)
+- Makefile: Unified test commands (`make test`, `make test-unit`)
+
+**Rationale**:
+- Quality assurance: Automated tests prevent regression errors
+- Fast feedback: CI/CD automatically runs tests on every commit
+- Documentation: Test cases are the best usage documentation
+- Continuous improvement: Test coverage can be continuously improved
+
+**Test Coverage**:
+- lib/args.sh: 100% (21 tests)
+- lib/core.sh: ~85% (8 tests)
+- lib/plugins.sh: ~90% (26 tests)
+- modules/io.sh: ~95% (21 tests)
+- services/xray/common.sh: 100% (20 tests)
+- **Total**: 96 test cases, ~80% code coverage
+
+---
+
+### ADR-010: Phase 1 Security Enhancements (2025-11-10)
+**Problem**: Code review found three high-priority security/stability issues
+
+**Decision**: Implement Phase 1 security fixes: domain validation enhancement, shortId generation unification, lock file management improvement
+
+**Implementation**:
+1. **Domain Validation Enhancement** (lib/validators.sh)
+   - Added RFC 3927 link-local address detection (169.254.0.0/16)
+   - Added RFC 6761 special-use domain detection (.test, .invalid)
+   - Added IPv6 private address detection (::1, fc00::/7, fe80::/10)
+   - Added 9 unit tests
+
+2. **shortId Generation Unification** (commands/install.sh)
+   - Use reliable tool chain: xxd → od → openssl
+   - Fixed hexdump format string error
+   - Guarantee all methods generate 16-character hexadecimal strings
+
+3. **Lock File Management Improvement** (scripts/caddy-cert-sync.sh)
+   - Migrate lock file location: /var/lock → /var/lib/xray-fusion/locks/
+   - Use install(1) atomic creation (prevent TOCTOU - CWE-362)
+   - Handle mixed sudo/non-sudo running scenarios (prevent CWE-283)
+
+**Rationale**:
+- Security: Close known validation vulnerabilities (IPv6, reserved domains)
+- Reliability: Unified shortId generation avoids length inconsistency
+- Stability: Lock file management supports mixed permission runtime environments
+- Standardization: Follow RFC specifications and systemd best practices
+
+**Reference Documents**:
 - RFC 6761: Special-Use Domain Names
 - RFC 4193: IPv6 Unique Local Addresses
 - RFC 3927: IPv4 Link-Local Addresses
@@ -210,41 +210,50 @@ make test-unit     # 单元测试（bats）
 
 ---
 
-## 核心教训总结
+## Core Lessons Learned
 
-### 1. 验证官方支持，不做假设
-- 查阅官方文档和 GitHub discussions
-- 验证关键功能（如 SIGHUP reload）实际支持情况
+### 1. Verify Official Support, Don't Assume
+- Consult official documentation and GitHub discussions
+- Verify actual support for critical features (e.g., SIGHUP reload)
 
-### 2. 选择适合场景的技术
-- Timer 比 Path 更可靠（虽然看起来不"高级"）
-- 成熟方案（Caddy）优于重复造轮子（acme.sh）
+### 2. Choose Technology Appropriate for the Scenario
+- Timer is more reliable than Path (although it doesn't look as "advanced")
+- Mature solutions (Caddy) are better than reinventing the wheel (acme.sh)
 
-### 3. 完整的错误恢复机制
-- 原子操作需要考虑多文件场景
-- 添加备份和回滚机制
+### 3. Complete Error Recovery Mechanisms
+- Atomic operations need to consider multi-file scenarios
+- Add backup and rollback mechanisms
 
-### 4. 安全默认和最小权限
-- systemd 服务启用安全加固（ProtectSystem、NoNewPrivileges）
-- 文件权限遵循最小权限原则
+### 4. Secure Defaults and Least Privilege
+- systemd services enable security hardening (ProtectSystem, NoNewPrivileges)
+- File permissions follow least privilege principle
 
-### 5. 代码整洁优于兼容性
-- 无用户则无负担，不做不必要的向后兼容
-- 删除不完整或废弃的代码
+### 5. Clean Code Over Compatibility
+- No users means no burden, don't do unnecessary backward compatibility
+- Delete incomplete or deprecated code
 
-### 6. 安全配置不可妥协
-- TLS 1.3 强制启用，无向下兼容（2025 安全标准）
-- 配置验证总是执行，无跳过选项
-- 并发保护必须实现，防止竞态条件
+### 6. Security Configuration Cannot Be Compromised
+- TLS 1.3 mandatory, no backward compatibility (2025 security standard)
+- Configuration validation always executes, no skip option
+- Concurrency protection must be implemented, prevent race conditions
 
-### 7. 完整性验证必须先于代码执行
-- 下载的代码验证必须在任何 source/执行之前完成（防止 CWE-494）
-- 验证逻辑不能依赖被验证的代码本身（"鸡生蛋"问题）
-- 使用可信的系统工具（git, gpg）进行独立验证
-- 验证失败必须立即终止，不留后门
+### 7. Integrity Verification Must Precede Code Execution
+- Downloaded code verification must be completed before any source/execution (prevent CWE-494)
+- Validation logic cannot depend on the code being validated itself ("chicken-egg" problem)
+- Use trusted system tools (git, gpg) for independent verification
+- Validation failure must immediately terminate, leave no backdoors
+
+### 8. Upstream Tool Compatibility Requires Defensive Parsing
+- External tool output formats change silently between versions (learned from PR #2)
+- Exact string matching breaks; use normalized label matching with multiple patterns
+- Test with actual tool binaries, not mocked data
+- Add version-specific test cases for known format variations
+- Silent format changes can cause production failures months/years after release
+
+**Real Example**: Xray v25.8.31+ changed x25519 output from "Public key:" to "Password:", breaking installations until robust parser was implemented (commit dfbce58).
 
 ---
 
-**文档维护**: 定期审查，随项目演进更新。遵循"具体、简洁、可操作"原则。
+**Document Maintenance**: Review regularly, update as project evolves. Follow "specific, concise, actionable" principles.
 
-**详细技术文档**: 请参见 [@AGENTS.md](./AGENTS.md)
+**Detailed Technical Documentation**: See [@AGENTS.md](./AGENTS.md)
