@@ -243,6 +243,15 @@ Adopt Test-Driven Development (TDD) mode by default:
 - Use trusted system tools (git, gpg) for independent verification
 - Validation failure must immediately terminate, leave no backdoors
 
+### 8. Upstream Tool Compatibility Requires Defensive Parsing
+- External tool output formats change silently between versions (learned from PR #2)
+- Exact string matching breaks; use normalized label matching with multiple patterns
+- Test with actual tool binaries, not mocked data
+- Add version-specific test cases for known format variations
+- Silent format changes can cause production failures months/years after release
+
+**Real Example**: Xray v25.8.31+ changed x25519 output from "Public key:" to "Password:", breaking installations until robust parser was implemented (commit dfbce58).
+
 ---
 
 **Document Maintenance**: Review regularly, update as project evolves. Follow "specific, concise, actionable" principles.
