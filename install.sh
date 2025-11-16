@@ -403,7 +403,7 @@ args::show_help() {
 xray-fusion online installer
 
 Usage:
-  curl -sL https://raw.githubusercontent.com/Joe-oss9527/xray-fusion/main/install.sh | bash -s -- [options]
+  curl -sL https://raw.githubusercontent.com/xrf9268-hue/xray/main/install.sh | bash -s -- [options]
 
 Options:
   --topology, -t <type>         Installation topology (reality-only|vision-reality)
@@ -426,7 +426,7 @@ Examples:
   curl -sL install.sh | bash -s -- --topology reality-only --version v1.8.1
 
 Environment Variables:
-  XRF_REPO_URL      Repository URL (default: https://github.com/Joe-oss9527/xray-fusion.git)
+  XRF_REPO_URL      Repository URL (default: https://github.com/xrf9268-hue/xray.git)
   XRF_BRANCH        Branch to use (default: main)
   XRF_INSTALL_DIR   Installation directory (default: /usr/local/xray-fusion)
 
