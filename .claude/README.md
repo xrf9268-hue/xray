@@ -309,9 +309,7 @@ Slash commands provide quick access to common workflows. Type `/help` to list al
 │   ├── audit.md                            # /audit command
 │   ├── commit.md                           # /commit command
 │   └── review-pr.md                        # /review-pr command
-├── README.md                                # This file
-├── HOOK_INTEGRATION_RESEARCH.md            # Research findings
-└── IMPLEMENTATION_PLAN.md                  # Implementation plan
+└── README.md                                # This file
 ```
 
 ---
@@ -499,8 +497,6 @@ Then use: `/deploy` or `/deploy staging`
 ### Project Documentation
 - [CLAUDE.md](../CLAUDE.md) - Architecture Decision Records (ADRs)
 - [AGENTS.md](../AGENTS.md) - Coding standards and guidelines
-- [HOOK_INTEGRATION_RESEARCH.md](./HOOK_INTEGRATION_RESEARCH.md) - Research findings
-- [IMPLEMENTATION_PLAN.md](./IMPLEMENTATION_PLAN.md) - Implementation plan
 
 ### Source Inspiration
 - [sbx repository](https://github.com/xrf9268-hue/sbx/tree/main/.claude) - Reference implementation
@@ -536,5 +532,5 @@ When adding new hooks or commands:
 **Questions or Issues?**
 
 - File issues at the project repository
-- Review implementation plan: `.claude/IMPLEMENTATION_PLAN.md`
-- Consult research findings: `.claude/HOOK_INTEGRATION_RESEARCH.md`
+- Review official documentation: https://code.claude.com/docs/en/hooks
+- Consult project standards: [CLAUDE.md](../CLAUDE.md) and [AGENTS.md](../AGENTS.md)
