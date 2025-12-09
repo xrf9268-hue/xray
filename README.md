@@ -153,6 +153,48 @@ bin/xrf plugin info cert-auto
 - `logrotate-obs`: Log rotation and observability
 - `links-qr`: QR code generation for client links
 
+## Client Requirements
+
+### Recommended Client Version
+
+Use Xray-core **v25.10.15 or later** for optimal compatibility. This version includes:
+- **uTLS library fixes** for Chrome fingerprint simulation (critical for stability)
+- Improved connection reliability
+- Enhanced protocol support
+
+### Download
+
+- **Official Releases**: https://github.com/XTLS/Xray-core/releases/latest
+- **Installation Guide**: https://xtls.github.io/en/document/install.html
+
+### Version Check
+
+```bash
+xray version
+```
+
+### Compatibility
+
+| Client Version | Status | Notes |
+|----------------|--------|-------|
+| v25.10.15+ | ✅ Recommended | Includes uTLS Chrome fingerprint fix |
+| v25.9.5 - v25.10.14 | ⚠️ Use with caution | May have connection issues |
+| v1.8.0 - v25.9.4 | ✅ Supported | Minimum required version |
+| < v1.8.0 | ❌ Not supported | Please upgrade |
+
+**Latest Tested**: v25.12.8 (2025-12-09)
+
+### Troubleshooting Client Issues
+
+If you experience connection problems:
+
+1. **Check client version**: `xray version`
+2. **Upgrade if outdated**: Download latest from [releases](https://github.com/XTLS/Xray-core/releases/latest)
+3. **Verify configuration**: Ensure client config matches server-provided links
+4. **Check logs**: `xray run -c config.json` to see detailed error messages
+
+For detailed troubleshooting, see [TROUBLESHOOTING.md](TROUBLESHOOTING.md).
+
 ## Advanced Configuration
 
 ### Deployment Modes
