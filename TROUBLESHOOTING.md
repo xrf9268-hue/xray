@@ -271,6 +271,61 @@ systemctl cat cert-reload.timer
 
 ## Connection Issues
 
+### Issue: Connection fails or frequent disconnects
+
+**Symptom**: Client cannot connect, or connections drop frequently.
+
+**Possible Cause**: Outdated Xray client version with known bugs.
+
+**Diagnosis**:
+```bash
+# Check client version
+xray version
+```
+
+**Known Version Issues**:
+- **v25.9.5 - v25.10.14**: uTLS library bug affecting Chrome fingerprint simulation
+- **< v1.8.0**: Incompatible protocol versions
+
+**Solution**:
+
+1. **Upgrade to latest version** (v25.10.15+):
+   ```bash
+   # Download latest release
+   curl -L https://github.com/XTLS/Xray-core/releases/latest/download/Xray-linux-64.zip -o xray.zip
+
+   # Extract and install
+   unzip xray.zip
+   sudo install -m 755 xray /usr/local/bin/
+
+   # Verify upgrade
+   xray version
+   ```
+
+2. **Verify client configuration**:
+   - Ensure UUID matches server configuration
+   - Check fingerprint is set to "chrome"
+   - Verify flow is "xtls-rprx-vision"
+
+3. **Check client logs**:
+   ```bash
+   xray run -c config.json
+   ```
+
+**Recommended Client Versions**:
+| Version | Status |
+|---------|--------|
+| v25.10.15+ | ✅ Recommended (includes uTLS fix) |
+| v25.9.5 - v25.10.14 | ⚠️ May have issues |
+| v1.8.0 - v25.9.4 | ✅ Supported |
+| < v1.8.0 | ❌ Not supported |
+
+**Official Downloads**: https://github.com/XTLS/Xray-core/releases/latest
+
+**Related**: v25.10.15 Release Notes, ADR-011
+
+---
+
 ### Issue: Cannot connect to Reality endpoint
 
 **Symptom**: Client connection timeout or refused.
