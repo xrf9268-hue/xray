@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # Atomic write + safe install helpers
+# NOTE: This module is sourced; strict mode (set -euo pipefail) must be enabled by the caller (e.g., via core::init()).
+
+[[ -n "${_XRF_IO_LOADED:-}" ]] && return 0
+readonly _XRF_IO_LOADED=1
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/core.sh
 . "${HERE}/lib/core.sh"
