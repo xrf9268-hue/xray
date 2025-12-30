@@ -1,0 +1,19 @@
+# ShellCheck configuration for bats test files
+# See: https://github.com/koalaman/shellcheck/wiki/Directive
+
+# SC2154: Referenced but not assigned
+# In bats tests, variables like PROJECT_ROOT, TEST_TMPDIR, BATS_TEST_DIRNAME
+# are defined by test_helper.bash or bats itself
+disable=SC2154
+
+# SC2034: Appears unused
+# In bats tests, variables are often set for the test framework to use
+disable=SC2034
+
+# SC1090: Can't follow non-constant source
+# Bats uses dynamic sourcing patterns
+disable=SC1090
+
+# SC2076: Remove quotes from =~ right-hand side
+# In bats tests, quoted strings in =~ are intentional for literal matching
+disable=SC2076

@@ -65,7 +65,8 @@ teardown() {
 
   # Function that fails twice then succeeds
   flaky_cmd() {
-    local count=$(cat "${counter_file}")
+    local count
+    count=$(cat "${counter_file}")
     count=$((count + 1))
     echo "${count}" > "${counter_file}"
     [ "${count}" -ge 3 ]
@@ -120,9 +121,11 @@ teardown() {
   sleep 0.1
 
   # Try to run another command with same lock (should wait)
-  local start_time=$(date +%s)
+  local start_time
+  start_time=$(date +%s)
   core::with_flock "${lock_file}" bash -c "echo 'second'"
-  local end_time=$(date +%s)
+  local end_time
+  end_time=$(date +%s)
 
   wait "${pid1}"
 

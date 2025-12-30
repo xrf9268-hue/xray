@@ -82,7 +82,8 @@ teardown() {
   # Check backup file exists with timestamp pattern
   local backup_dir
   backup_dir="$(backup::dir)"
-  [[ -f "${backup_dir}"/backup-*.tar.gz ]]
+  # SC2144: Use compgen -G to test glob patterns
+  compgen -G "${backup_dir}/backup-*.tar.gz" > /dev/null
 }
 
 @test "backup::create - uses custom name" {
@@ -93,7 +94,8 @@ teardown() {
 
   local backup_dir
   backup_dir="$(backup::dir)"
-  [[ -f "${backup_dir}"/custom-backup-*.tar.gz ]]
+  # SC2144: Use compgen -G to test glob patterns
+  compgen -G "${backup_dir}/custom-backup-*.tar.gz" > /dev/null
 }
 
 @test "backup::create - creates metadata file" {

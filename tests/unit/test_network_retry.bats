@@ -47,7 +47,8 @@ teardown() {
 
   flaky_command() {
     local state_file="${1}"
-    local count=$(cat "${state_file}")
+    local count
+    count=$(cat "${state_file}")
     count=$((count + 1))
     echo "${count}" > "${state_file}"
 
@@ -84,9 +85,11 @@ teardown() {
   slow_command() { return 1; }
   export -f slow_command
 
-  local start=$(date +%s)
+  local start
+  start=$(date +%s)
   run network::retry 4 1 slow_command
-  local end=$(date +%s)
+  local end
+  end=$(date +%s)
   local duration=$((end - start))
 
   # Expected delays: 1s + 2s + 4s = 7s minimum
@@ -145,9 +148,11 @@ teardown() {
   failing_command() { return 1; }
   export -f failing_command
 
-  local start=$(date +%s)
+  local start
+  start=$(date +%s)
   run network::retry 3 0 failing_command
-  local end=$(date +%s)
+  local end
+  end=$(date +%s)
   local duration=$((end - start))
 
   # Should complete quickly with zero delay
@@ -182,7 +187,8 @@ teardown() {
 
   flaky_download() {
     local state_file="${1}"
-    local count=$(cat "${state_file}")
+    local count
+    count=$(cat "${state_file}")
     count=$((count + 1))
     echo "${count}" > "${state_file}"
 
@@ -211,9 +217,11 @@ teardown() {
   export -f slow_command
 
   # Should fail quickly if max_retries * delay < command time
-  local start=$(date +%s)
+  local start
+  start=$(date +%s)
   timeout 5 bash -c "network::retry 2 1 slow_command" || true
-  local end=$(date +%s)
+  local end
+  end=$(date +%s)
   local duration=$((end - start))
 
   # Should timeout around 5 seconds
