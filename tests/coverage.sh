@@ -39,12 +39,12 @@ MODULES=(
 
 count_functions() {
   local file="${1}"
-  grep -cE '^[a-zA-Z_][a-zA-Z0-9_:]*\s*\(\)\s*\{?' "${file}" 2>/dev/null || echo 0
+  grep -cE '^[a-zA-Z_][a-zA-Z0-9_:]*\s*\(\)\s*\{?' "${file}" 2> /dev/null || echo 0
 }
 
 list_functions() {
   local file="${1}"
-  grep -oE '^[a-zA-Z_][a-zA-Z0-9_:]*\s*\(\)' "${file}" 2>/dev/null | sed 's/()//' || true
+  grep -oE '^[a-zA-Z_][a-zA-Z0-9_:]*\s*\(\)' "${file}" 2> /dev/null | sed 's/()//' || true
 }
 
 find_test_file() {
@@ -71,7 +71,7 @@ find_test_file() {
 count_tests() {
   local testfile="${1}"
   if [[ -f "${testfile}" ]]; then
-    grep -cE '^@test' "${testfile}" 2>/dev/null || echo 0
+    grep -cE '^@test' "${testfile}" 2> /dev/null || echo 0
   else
     echo 0
   fi
@@ -93,9 +93,10 @@ generate_report() {
     local modpath="${PROJECT_ROOT}/${module}"
     [[ -f "${modpath}" ]] || continue
 
-    local funcs=$(count_functions "${modpath}")
-    local testfile=$(find_test_file "${module}")
-    local tests=$(count_tests "${testfile}")
+    local funcs testfile tests
+    funcs=$(count_functions "${modpath}")
+    testfile=$(find_test_file "${module}")
+    tests=$(count_tests "${testfile}")
 
     total_funcs=$((total_funcs + funcs))
     total_tests=$((total_tests + tests))

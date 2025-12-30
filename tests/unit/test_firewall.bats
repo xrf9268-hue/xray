@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 # Test modules/fw/*.sh - Firewall management
+# shellcheck disable=SC2154  # Variables defined in test_helper.bash
 
 load ../test_helper
 

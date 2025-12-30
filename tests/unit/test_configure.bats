@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 # Test services/xray/configure.sh - Xray configuration rendering
+# shellcheck disable=SC2154  # Variables defined in test_helper.bash
 
 load ../test_helper
 
