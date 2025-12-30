@@ -8,6 +8,40 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${HERE}/lib/core.sh"
 
 ##
+# Validate hostname (public domain or hostname)
+#
+# Ensures the hostname is RFC-compliant and free of unsafe characters that
+# could break JSON rendering or shell execution.
+#
+# Arguments:
+#   $1 - Hostname (string, required)
+#
+# Returns:
+#   0 - Valid hostname
+#   1 - Invalid hostname
+##
+validators::hostname() {
+  local host="${1:-}"
+
+  if [[ -z "${host}" ]]; then
+    core::log debug "hostname validation failed: empty" "{}"
+    return 1
+  fi
+
+  if [[ "${host}" =~ [\"{}[:space:]] ]]; then
+    core::log debug "hostname validation failed: unsafe characters" "$(printf '{"hostname":"%s"}' "${host}")"
+    return 1
+  fi
+
+  if ! validators::domain "${host}"; then
+    core::log debug "hostname validation failed: domain check" "$(printf '{"hostname":"%s"}' "${host}")"
+    return 1
+  fi
+
+  return 0
+}
+
+##
 # Validate domain name (RFC 1035 compliant)
 #
 # Validates domain names according to DNS specifications and rejects
