@@ -3,6 +3,7 @@
 
 # Setup isolated test environment
 setup_integration_env() {
+  export PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
   export TEST_ROOT="${BATS_TEST_TMPDIR}/xrf-integration"
   export XRF_PREFIX="${TEST_ROOT}/prefix"
   export XRF_ETC="${TEST_ROOT}/etc"

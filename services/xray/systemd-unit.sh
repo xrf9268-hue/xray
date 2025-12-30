@@ -5,24 +5,63 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 . "${HERE}/modules/io.sh"
 . "${HERE}/modules/user/user.sh"
 . "${HERE}/lib/plugins.sh"
-unit_path() { echo "/etc/systemd/system/xray.service"; }
+. "${HERE}/modules/state.sh"
+unit_path() { systemd_unit_path; }
 install_unit() {
   core::init "${@}"
+  core::log info "installing systemd unit" "{}"
+  core::with_flock "$(state::lock)" install_unit_with_lock
+}
+systemd_unit_path() {
+  local base="${XRF_SYSTEMD_DIR:-/etc/systemd/system}"
+  echo "${base%/}/xray.service"
+}
+install_unit_with_lock() {
   user::ensure_system_user xray xray
   local unit_file
-  unit_file="$(unit_path)"
-  io::atomic_write "${unit_file}" 0644 < "${HERE}/packaging/systemd/xray.service"
-  systemctl daemon-reload
-  systemctl enable --now xray || true
+  unit_file="$(systemd_unit_path)"
+  core::log info "preparing systemd unit directory" "$(printf '{"dir":"%s"}' "$(dirname "${unit_file}")")"
+  io::ensure_dir "$(dirname "${unit_file}")" 0755
+  core::log info "writing systemd unit file" "$(printf '{"path":"%s"}' "${unit_file}")"
+  if ! io::atomic_write "${unit_file}" 0644 < "${HERE}/packaging/systemd/xray.service"; then
+    core::log error "failed to write systemd unit" "$(printf '{"path":"%s"}' "${unit_file}")"
+    return 1
+  fi
+  core::log info "reloading systemd manager configuration" '{}'
+  if ! systemctl daemon-reload; then
+    core::log error "systemctl daemon-reload failed" '{}'
+    rm -f "${unit_file}" 2> /dev/null || true
+    return 1
+  fi
+  core::log info "enabling and starting xray service" "$(printf '{"unit":"%s"}' "xray.service")"
+  if ! systemctl enable --now xray; then
+    core::log error "systemctl enable --now failed" "$(printf '{"unit":"%s"}' "xray.service")"
+    rollback_systemd_unit "${unit_file}"
+    return 1
+  fi
   plugins::ensure_dirs
   plugins::load_enabled
   plugins::emit service_setup "unit=${unit_file}"
   core::log info "systemd unit installed" "$(printf '{"path":"%s"}' "${unit_file}")"
 }
+rollback_systemd_unit() {
+  local unit_file="${1}"
+  core::log warn "rolling back systemd unit installation" "$(printf '{"path":"%s"}' "${unit_file}")"
+  if ! systemctl disable --now xray; then
+    core::log warn "systemctl disable during rollback failed" "$(printf '{"unit":"%s"}' "xray.service")"
+  fi
+  rm -f "${unit_file}" 2> /dev/null || true
+  if ! systemctl daemon-reload; then
+    core::log warn "systemctl daemon-reload during rollback failed" '{}'
+  fi
+  if ! systemctl reset-failed xray.service 2> /dev/null; then
+    core::log warn "systemctl reset-failed during rollback failed" '{}'
+  fi
+}
 remove_unit() {
   core::init "${@}"
   local unit_file
-  unit_file="$(unit_path)"
+  unit_file="$(systemd_unit_path)"
   plugins::ensure_dirs
   plugins::load_enabled
   plugins::emit service_remove "unit=${unit_file}"
