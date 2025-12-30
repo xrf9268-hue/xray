@@ -1,5 +1,9 @@
 #!/usr/bin/env bash
 # Network helpers
+# NOTE: This module is sourced; callers are responsible for enabling strict mode (set -euo pipefail) via core::init().
+
+[[ -n "${_XRF_NET_NETWORK_LOADED:-}" ]] && return 0
+readonly _XRF_NET_NETWORK_LOADED=1
 
 net::detect_public_ip() {
   local ip=""
