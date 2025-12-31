@@ -214,8 +214,12 @@ xray::render_reality_inbound() {
   server_names="$(json_array_from_csv "${XRAY_SNI}" "XRAY_SNI" first_sni)"
   reality_dest="$(ensure_reality_dest "${XRAY_REALITY_DEST:-}" "${first_sni}")"
   shortids_pool="$(build_shortids_pool "${XRAY_SHORT_ID}" "${XRAY_SHORT_ID_2:-}" "${XRAY_SHORT_ID_3:-}")"
-  sanitized_uuid="$(xray::sanitize_json_string "${XRAY_UUID}" "XRAY_UUID")"
-  sanitized_key="$(xray::sanitize_json_string "${XRAY_PRIVATE_KEY}" "XRAY_PRIVATE_KEY")"
+  if ! sanitized_uuid="$(xray::sanitize_json_string "${XRAY_UUID}" "XRAY_UUID")"; then
+    core::log fatal "invalid XRAY_UUID characters" "{}"
+  fi
+  if ! sanitized_key="$(xray::sanitize_json_string "${XRAY_PRIVATE_KEY}" "XRAY_PRIVATE_KEY")"; then
+    core::log fatal "invalid XRAY_PRIVATE_KEY characters" "{}"
+  fi
 
   # Write inbound configuration
   jq -n \
@@ -294,9 +298,15 @@ xray::render_vision_reality_inbounds() {
   server_names="$(json_array_from_csv "${XRAY_SNI}" "XRAY_SNI" first_sni)"
   reality_dest="$(ensure_reality_dest "${XRAY_REALITY_DEST:-}" "${first_sni}")"
   shortids_pool="$(build_shortids_pool "${XRAY_SHORT_ID}" "${XRAY_SHORT_ID_2:-}" "${XRAY_SHORT_ID_3:-}")"
-  sanitized_vision_uuid="$(xray::sanitize_json_string "${XRAY_UUID_VISION}" "XRAY_UUID_VISION")"
-  sanitized_reality_uuid="$(xray::sanitize_json_string "${XRAY_UUID_REALITY}" "XRAY_UUID_REALITY")"
-  sanitized_key="$(xray::sanitize_json_string "${XRAY_PRIVATE_KEY}" "XRAY_PRIVATE_KEY")"
+  if ! sanitized_vision_uuid="$(xray::sanitize_json_string "${XRAY_UUID_VISION}" "XRAY_UUID_VISION")"; then
+    core::log fatal "invalid XRAY_UUID_VISION characters" "{}"
+  fi
+  if ! sanitized_reality_uuid="$(xray::sanitize_json_string "${XRAY_UUID_REALITY}" "XRAY_UUID_REALITY")"; then
+    core::log fatal "invalid XRAY_UUID_REALITY characters" "{}"
+  fi
+  if ! sanitized_key="$(xray::sanitize_json_string "${XRAY_PRIVATE_KEY}" "XRAY_PRIVATE_KEY")"; then
+    core::log fatal "invalid XRAY_PRIVATE_KEY characters" "{}"
+  fi
 
   # Write dual inbound configuration
   jq -n \
