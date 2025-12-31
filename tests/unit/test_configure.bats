@@ -52,7 +52,7 @@ setup() {
 
     local item trimmed sanitized first_assigned="false"
     for item in "${raw_items[@]}"; do
-      trimmed="$(echo "${item}" | xargs)"
+      IFS=$' \t\n' read -r trimmed <<< "${item}"
       [[ -z "${trimmed}" ]] && continue
       if ! validators::hostname "${trimmed}"; then
         core::log error "invalid host entry" "$(printf '{"field":"%s","value":"%s"}' "${field}" "${trimmed//\"/\\\"}")"
@@ -78,7 +78,7 @@ setup() {
 
   ensure_reality_dest() {
     local dest="${1}" sni="${2}"
-    dest="$(echo "${dest}" | xargs)"
+    IFS=$' \t\n' read -r dest <<< "${dest}"
     [[ -z "${dest}" ]] && dest="${sni}"
 
     if [[ -z "${dest}" ]]; then
@@ -206,18 +206,18 @@ teardown() {
 # === json_array_from_csv Tests ===
 
 @test "json_array_from_csv converts single value" {
-  result="$(json_array_from_csv "value1")"
-  [ "$(echo "${result}" | jq -c '.')" = '["value1"]' ]
+  result="$(json_array_from_csv "example.com")"
+  [ "$(echo "${result}" | jq -c '.')" = '["example.com"]' ]
 }
 
 @test "json_array_from_csv converts multiple values" {
-  result="$(json_array_from_csv "value1,value2,value3")"
-  [ "$(echo "${result}" | jq -c '.')" = '["value1","value2","value3"]' ]
+  result="$(json_array_from_csv "example.com,test.com,demo.com")"
+  [ "$(echo "${result}" | jq -c '.')" = '["example.com","test.com","demo.com"]' ]
 }
 
 @test "json_array_from_csv handles spaces" {
-  result="$(json_array_from_csv "value1, value2, value3")"
-  [ "$(echo "${result}" | jq -c '.')" = '["value1","value2","value3"]' ]
+  result="$(json_array_from_csv "example.com, test.com, demo.com")"
+  [ "$(echo "${result}" | jq -c '.')" = '["example.com","test.com","demo.com"]' ]
 }
 
 @test "json_array_from_csv handles empty input" {
@@ -302,7 +302,7 @@ line2" "test")"
 }
 
 @test "build_shortids_pool always includes empty string first" {
-  result="$(build_shortids_pool "test1234")"
+  result="$(build_shortids_pool "abcd1234")"
   [[ "$(echo "${result}" | jq -c '. | .[0]')" == '""' ]]
 }
 

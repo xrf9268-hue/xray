@@ -41,7 +41,7 @@ json_array_from_csv() {
 
   local item trimmed sanitized first_assigned="false"
   for item in "${raw_items[@]}"; do
-    trimmed="$(echo "${item}" | xargs)"
+    IFS=$' \t\n' read -r trimmed <<< "${item}"
     [[ -z "${trimmed}" ]] && continue
     if ! validators::hostname "${trimmed}"; then
       core::log error "invalid host entry" "$(printf '{"field":"%s","value":"%s"}' "${field}" "${trimmed//\"/\\\\\"}")"
@@ -68,7 +68,7 @@ json_array_from_csv() {
 # Helper: Ensure reality destination format (hostname:port)
 ensure_reality_dest() {
   local dest="${1}" default_host="${2}"
-  dest="$(echo "${dest}" | xargs)"
+  IFS=$' \t\n' read -r dest <<< "${dest}"
   [[ -z "${dest}" ]] && dest="${default_host}"
 
   if [[ -z "${dest}" ]]; then
