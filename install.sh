@@ -139,8 +139,8 @@ cleanup() {
     kill "${SPINNER_PID}" 2> /dev/null || true
     wait "${SPINNER_PID}" 2> /dev/null || true
   fi
-  # Clean up temp directory
-  [[ -n "${TMP_DIR:-}" && -d "${TMP_DIR}" ]] && rm -rf "${TMP_DIR}"
+  # Clean up temp directory (|| true prevents false condition from affecting exit code)
+  [[ -n "${TMP_DIR:-}" && -d "${TMP_DIR}" ]] && rm -rf "${TMP_DIR}" || true
 }
 
 trap cleanup EXIT

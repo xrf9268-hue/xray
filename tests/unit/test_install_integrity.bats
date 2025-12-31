@@ -15,7 +15,7 @@ teardown() {
 create_temp_repo() {
   local path="${1}"
   mkdir -p "${path}"
-  pushd "${path}" >/dev/null
+  pushd "${path}" >/dev/null || return
   git init >/dev/null 2>&1
   git config user.email "test@example.com"
   git config user.name "Test User"
@@ -23,7 +23,7 @@ create_temp_repo() {
   echo "test content" > file.txt
   git add file.txt
   git commit -m "initial commit" >/dev/null 2>&1
-  popd >/dev/null
+  popd >/dev/null || return
 }
 
 @test "install.sh - integrity check fails on commit mismatch" {
