@@ -671,23 +671,6 @@ fetch_expected_commit() {
   return 0
 }
 
-determine_download_commit() {
-  local repo_dir="${1:-}"
-  local tar_root="${2:-}"
-
-  if [[ -d "${repo_dir}/.git" ]]; then
-    git -C "${repo_dir}" rev-parse HEAD 2> /dev/null || true
-    return 0
-  fi
-
-  if [[ -n "${tar_root}" ]]; then
-    extract_commit_from_tar_root "${tar_root}" || true
-    return 0
-  fi
-
-  echo ""
-}
-
 enforce_integrity_checks() {
   local repo_dir="${1:-}"
   local actual_commit="${2:-}"
@@ -840,10 +823,15 @@ download_project() {
     error_exit "Unable to determine expected commit for verification"
   fi
 
-  DOWNLOAD_COMMIT="$(determine_download_commit "${TMP_DIR}/xray-fusion" "${TARBALL_ROOT_DIR}")"
-  if [[ -n "${DOWNLOAD_COMMIT}" ]]; then
-    log_debug "Downloaded commit: ${DOWNLOAD_COMMIT}"
+  DOWNLOAD_COMMIT=""
+  if [[ -d "${TMP_DIR}/xray-fusion/.git" ]]; then
+    DOWNLOAD_COMMIT="$(git -C "${TMP_DIR}/xray-fusion" rev-parse HEAD 2> /dev/null || true)"
+  elif [[ -n "${TARBALL_ROOT_DIR}" ]]; then
+    if ! DOWNLOAD_COMMIT="$(extract_commit_from_tar_root "${TARBALL_ROOT_DIR}")"; then
+      DOWNLOAD_COMMIT=""
+    fi
   fi
+  log_debug "Downloaded commit: ${DOWNLOAD_COMMIT:-unknown}"
 
   if ! enforce_integrity_checks "${TMP_DIR}/xray-fusion" "${DOWNLOAD_COMMIT}" "${EXPECTED_COMMIT}" "${REQUIRE_SIGNED_TAG}"; then
     error_exit "Integrity verification failed (commit/GPG)"
