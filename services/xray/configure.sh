@@ -18,35 +18,105 @@ readonly XRAY_CONFIG_09_ROUTING="09_routing.json"     # Routing rules (loaded la
 
 core::log debug "configure.sh started" "$(printf '{"args":"%s"}' "$*")"
 
-# Helper: Convert CSV to JSON array
+# Helper: Sanitize user-derived strings for JSON safety
+xray::sanitize_json_string() {
+  local value="${1:-}" field="${2:-value}" sanitized
+
+  sanitized="${value//$'\r'/}"
+  sanitized="${sanitized//$'\n'/}"
+
+  if [[ "${sanitized}" =~ [\"{}] ]]; then
+    core::log error "unsafe characters in input" "$(printf '{"field":"%s"}' "${field}")"
+    return "${ERR_INVALID_ARG}"
+  fi
+
+  printf '%s' "${sanitized}"
+}
+
+# Helper: Convert CSV to sanitized JSON array
 json_array_from_csv() {
-  local IFS=','
-  read -ra items <<< "${1}"
-  local json_output="["
-  for item in "${items[@]}"; do
-    item="$(echo "${item}" | xargs)"
-    [[ -n "${item}" ]] && json_output="${json_output}\"${item}\","
+  local csv="${1}" field="${2:-value}" first_ref_name="${3:-}"
+  local IFS=',' raw_items=() sanitized_items=()
+  read -ra raw_items <<< "${csv}"
+
+  local item trimmed sanitized first_assigned="false"
+  for item in "${raw_items[@]}"; do
+    IFS=$' \t\n' read -r trimmed <<< "${item}"
+    [[ -z "${trimmed}" ]] && continue
+    if ! validators::hostname "${trimmed}"; then
+      core::log error "invalid host entry" "$(printf '{"field":"%s","value":"%s"}' "${field}" "${trimmed//\"/\\\\\"}")"
+      return "${ERR_INVALID_ARG}"
+    fi
+    if ! sanitized="$(xray::sanitize_json_string "${trimmed}" "${field}")"; then
+      return "${ERR_INVALID_ARG}"
+    fi
+    if [[ -n "${first_ref_name}" && "${first_assigned}" == "false" ]]; then
+      printf -v "${first_ref_name}" '%s' "${sanitized}"
+      first_assigned="true"
+    fi
+    sanitized_items+=("${sanitized}")
   done
-  printf '%s' "${json_output%,}]"
+
+  if [[ "${#sanitized_items[@]}" -eq 0 ]]; then
+    printf '[]'
+    return 0
+  fi
+
+  printf '%s\n' "${sanitized_items[@]}" | jq -R . | jq -s .
 }
 
 # Helper: Ensure reality destination format (hostname:port)
 ensure_reality_dest() {
-  local dest="${1}" sni="${2}"
-  if [[ -z "${dest}" ]]; then dest="${sni%%,*}"; fi
-  dest="$(echo "${dest}" | xargs)"
-  if [[ "${dest}" != *:* ]]; then dest="${dest}:443"; fi
-  printf '%s' "${dest}"
+  local dest="${1}" default_host="${2}"
+  IFS=$' \t\n' read -r dest <<< "${dest}"
+  [[ -z "${dest}" ]] && dest="${default_host}"
+
+  if [[ -z "${dest}" ]]; then
+    core::log error "reality destination required" "{}"
+    return "${ERR_INVALID_ARG}"
+  fi
+
+  local sanitized
+  if ! sanitized="$(xray::sanitize_json_string "${dest}" "XRAY_REALITY_DEST")"; then
+    return "${ERR_INVALID_ARG}"
+  fi
+
+  local host port
+  if [[ "${sanitized}" == *:* ]]; then
+    host="${sanitized%%:*}"
+    port="${sanitized##*:}"
+  else
+    host="${sanitized}"
+    port="443"
+  fi
+
+  if ! validators::hostname "${host}"; then
+    core::log error "invalid destination host" "$(printf '{"host":"%s"}' "${host//\"/\\\"}")"
+    return "${ERR_INVALID_ARG}"
+  fi
+
+  if ! validators::port "${port}"; then
+    core::log error "invalid destination port" "$(printf '{"port":"%s"}' "${port}")"
+    return "${ERR_INVALID_ARG}"
+  fi
+
+  printf '%s:%s' "${host}" "${port}"
 }
 
 # Helper: Build shortIds pool array
 build_shortids_pool() {
   local primary="${1}" secondary="${2:-}" tertiary="${3:-}"
-  local pool="[\"\",\"${primary}\""
-  [[ -n "${secondary}" ]] && pool="${pool},\"${secondary}\""
-  [[ -n "${tertiary}" ]] && pool="${pool},\"${tertiary}\""
-  pool="${pool}]"
-  printf '%s' "${pool}"
+
+  if ! validators::shortid "${primary}" || ! validators::shortid "${secondary}" || ! validators::shortid "${tertiary}"; then
+    core::log error "invalid shortId provided" "{}"
+    return "${ERR_INVALID_ARG}"
+  fi
+
+  jq -n --arg primary "${primary}" --arg secondary "${secondary}" --arg tertiary "${tertiary}" '
+    ["", $primary]
+    + (if $secondary != "" then [$secondary] else [] end)
+    + (if $tertiary != "" then [$tertiary] else [] end)
+  '
 }
 
 ##
@@ -134,23 +204,57 @@ xray::render_reality_inbound() {
   : "${XRAY_PORT:=443}" : "${XRAY_UUID:?}" : "${XRAY_SNI:=www.microsoft.com}"
   : "${XRAY_SHORT_ID:?}" : "${XRAY_PRIVATE_KEY:?}"
 
-  [[ -n "${XRAY_PRIVATE_KEY}" ]] || {
-    core::log fatal "XRAY_PRIVATE_KEY required"
-  }
+  validators::port "${XRAY_PORT}" || core::log fatal "invalid XRAY_PORT" "$(printf '{"port":"%s"}' "${XRAY_PORT}")"
+  validators::uuid "${XRAY_UUID}" || core::log fatal "invalid XRAY_UUID format" "$(printf '{"uuid":"%s"}' "${XRAY_UUID}")"
+  validators::shortid "${XRAY_SHORT_ID}" || core::log fatal "invalid XRAY_SHORT_ID" "{}"
+  [[ -n "${XRAY_PRIVATE_KEY}" ]] || core::log fatal "XRAY_PRIVATE_KEY required" "{}"
 
   # Prepare configuration values
-  local reality_dest server_names shortids_pool
-  reality_dest="$(ensure_reality_dest "${XRAY_REALITY_DEST:-}" "${XRAY_SNI}")"
-  server_names="$(json_array_from_csv "${XRAY_SNI}")"
+  local first_sni reality_dest server_names shortids_pool sanitized_uuid sanitized_key
+  server_names="$(json_array_from_csv "${XRAY_SNI}" "XRAY_SNI" first_sni)"
+  reality_dest="$(ensure_reality_dest "${XRAY_REALITY_DEST:-}" "${first_sni}")"
   shortids_pool="$(build_shortids_pool "${XRAY_SHORT_ID}" "${XRAY_SHORT_ID_2:-}" "${XRAY_SHORT_ID_3:-}")"
+  if ! sanitized_uuid="$(xray::sanitize_json_string "${XRAY_UUID}" "XRAY_UUID")"; then
+    core::log fatal "invalid XRAY_UUID characters" "{}"
+  fi
+  if ! sanitized_key="$(xray::sanitize_json_string "${XRAY_PRIVATE_KEY}" "XRAY_PRIVATE_KEY")"; then
+    core::log fatal "invalid XRAY_PRIVATE_KEY characters" "{}"
+  fi
 
   # Write inbound configuration
-  cat > "${release_dir}/${XRAY_CONFIG_05_INBOUNDS}" << JSON
-{"inbounds":[{"tag":"reality","listen":"0.0.0.0","port":${XRAY_PORT},"protocol":"vless",
-"settings":{"clients":[{"id":"${XRAY_UUID}","flow":"xtls-rprx-vision"}],"decryption":"none"},
-"streamSettings":{"network":"tcp","security":"reality","realitySettings":{"show":false,"dest":"${reality_dest}","xver":0,"serverNames":${server_names},"privateKey":"${XRAY_PRIVATE_KEY}","shortIds":${shortids_pool},"spiderX":"/"}},
-"sniffing":{"enabled":${sniff_bool},"destOverride":["http","tls","quic"]}}]}
-JSON
+  jq -n \
+    --argjson port "${XRAY_PORT}" \
+    --arg uuid "${sanitized_uuid}" \
+    --arg dest "${reality_dest}" \
+    --argjson serverNames "${server_names}" \
+    --arg privateKey "${sanitized_key}" \
+    --argjson shortIds "${shortids_pool}" \
+    --argjson sniff "${sniff_bool}" \
+    '{
+      inbounds: [
+        {
+          tag: "reality",
+          listen: "0.0.0.0",
+          port: $port,
+          protocol: "vless",
+          settings: {clients: [{id: $uuid, flow: "xtls-rprx-vision"}], decryption: "none"},
+          streamSettings: {
+            network: "tcp",
+            security: "reality",
+            realitySettings: {
+              show: false,
+              dest: $dest,
+              xver: 0,
+              serverNames: $serverNames,
+              privateKey: $privateKey,
+              shortIds: $shortIds,
+              spiderX: "/"
+            }
+          },
+          sniffing: {enabled: $sniff, destOverride: ["http","tls","quic"]}
+        }
+      ]
+    }' | io::atomic_write "${release_dir}/${XRAY_CONFIG_05_INBOUNDS}" 0640
 
   core::log debug "reality-only inbound config written" "$(printf '{"port":%d}' "${XRAY_PORT}")"
 }
@@ -180,23 +284,95 @@ xray::render_vision_reality_inbounds() {
   }
 
   # Prepare configuration values
-  local reality_dest server_names shortids_pool
-  reality_dest="$(ensure_reality_dest "${XRAY_REALITY_DEST:-}" "${XRAY_SNI}")"
-  server_names="$(json_array_from_csv "${XRAY_SNI}")"
+  validators::port "${XRAY_VISION_PORT}" || core::log fatal "invalid XRAY_VISION_PORT" "$(printf '{"port":"%s"}' "${XRAY_VISION_PORT}")"
+  validators::port "${XRAY_REALITY_PORT}" || core::log fatal "invalid XRAY_REALITY_PORT" "$(printf '{"port":"%s"}' "${XRAY_REALITY_PORT}")"
+  validators::port "${XRAY_FALLBACK_PORT}" || core::log fatal "invalid XRAY_FALLBACK_PORT" "$(printf '{"port":"%s"}' "${XRAY_FALLBACK_PORT}")"
+  validators::uuid "${XRAY_UUID_VISION}" || core::log fatal "invalid XRAY_UUID_VISION format" "$(printf '{"uuid":"%s"}' "${XRAY_UUID_VISION}")"
+  validators::uuid "${XRAY_UUID_REALITY}" || core::log fatal "invalid XRAY_UUID_REALITY format" "$(printf '{"uuid":"%s"}' "${XRAY_UUID_REALITY}")"
+  validators::domain "${XRAY_DOMAIN}" || core::log fatal "invalid XRAY_DOMAIN" "$(printf '{"domain":"%s"}' "${XRAY_DOMAIN}")"
+  validators::shortid "${XRAY_SHORT_ID}" || core::log fatal "invalid XRAY_SHORT_ID" "{}"
+  validators::shortid "${XRAY_SHORT_ID_2:-}" || core::log fatal "invalid XRAY_SHORT_ID_2" "{}"
+  validators::shortid "${XRAY_SHORT_ID_3:-}" || core::log fatal "invalid XRAY_SHORT_ID_3" "{}"
+
+  local first_sni reality_dest server_names shortids_pool sanitized_vision_uuid sanitized_reality_uuid sanitized_key
+  server_names="$(json_array_from_csv "${XRAY_SNI}" "XRAY_SNI" first_sni)"
+  reality_dest="$(ensure_reality_dest "${XRAY_REALITY_DEST:-}" "${first_sni}")"
   shortids_pool="$(build_shortids_pool "${XRAY_SHORT_ID}" "${XRAY_SHORT_ID_2:-}" "${XRAY_SHORT_ID_3:-}")"
+  if ! sanitized_vision_uuid="$(xray::sanitize_json_string "${XRAY_UUID_VISION}" "XRAY_UUID_VISION")"; then
+    core::log fatal "invalid XRAY_UUID_VISION characters" "{}"
+  fi
+  if ! sanitized_reality_uuid="$(xray::sanitize_json_string "${XRAY_UUID_REALITY}" "XRAY_UUID_REALITY")"; then
+    core::log fatal "invalid XRAY_UUID_REALITY characters" "{}"
+  fi
+  if ! sanitized_key="$(xray::sanitize_json_string "${XRAY_PRIVATE_KEY}" "XRAY_PRIVATE_KEY")"; then
+    core::log fatal "invalid XRAY_PRIVATE_KEY characters" "{}"
+  fi
 
   # Write dual inbound configuration
-  cat > "${release_dir}/${XRAY_CONFIG_05_INBOUNDS}" << JSON
-{"inbounds":[
-{"tag":"vision","listen":"0.0.0.0","port":${XRAY_VISION_PORT},"protocol":"vless",
- "settings":{"clients":[{"id":"${XRAY_UUID_VISION}","flow":"xtls-rprx-vision"}],"decryption":"none","fallbacks":[{"alpn":"h2","dest":${XRAY_FALLBACK_PORT}},{"dest":${XRAY_FALLBACK_PORT}}]},
- "streamSettings":{"network":"tcp","security":"tls","tlsSettings":{"minVersion":"1.3","rejectUnknownSni":true,"alpn":["h2","http/1.1"],"certificates":[{"certificateFile":"${XRAY_CERT_DIR}/fullchain.pem","keyFile":"${XRAY_CERT_DIR}/privkey.pem"}]}},
- "sniffing":{"enabled":${sniff_bool},"destOverride":["http","tls"]}},
-{"tag":"reality","listen":"0.0.0.0","port":${XRAY_REALITY_PORT},"protocol":"vless",
- "settings":{"clients":[{"id":"${XRAY_UUID_REALITY}","flow":"xtls-rprx-vision"}],"decryption":"none"},
- "streamSettings":{"network":"tcp","security":"reality","realitySettings":{"show":false,"dest":"${reality_dest}","xver":0,"serverNames":${server_names},"privateKey":"${XRAY_PRIVATE_KEY}","shortIds":${shortids_pool},"spiderX":"/"}},
- "sniffing":{"enabled":${sniff_bool},"destOverride":["http","tls","quic"]}}]}
-JSON
+  jq -n \
+    --argjson vision_port "${XRAY_VISION_PORT}" \
+    --argjson reality_port "${XRAY_REALITY_PORT}" \
+    --argjson fallback_port "${XRAY_FALLBACK_PORT}" \
+    --arg vision_uuid "${sanitized_vision_uuid}" \
+    --arg reality_uuid "${sanitized_reality_uuid}" \
+    --argjson serverNames "${server_names}" \
+    --arg privateKey "${sanitized_key}" \
+    --argjson shortIds "${shortids_pool}" \
+    --arg dest "${reality_dest}" \
+    --arg cert_dir "${XRAY_CERT_DIR}" \
+    --argjson sniff "${sniff_bool}" \
+    '{
+      inbounds: [
+        {
+          tag: "vision",
+          listen: "0.0.0.0",
+          port: $vision_port,
+          protocol: "vless",
+          settings: {
+            clients: [{id: $vision_uuid, flow: "xtls-rprx-vision"}],
+            decryption: "none",
+            fallbacks: [
+              {alpn: "h2", dest: $fallback_port},
+              {dest: $fallback_port}
+            ]
+          },
+          streamSettings: {
+            network: "tcp",
+            security: "tls",
+            tlsSettings: {
+              minVersion: "1.3",
+              rejectUnknownSni: true,
+              alpn: ["h2","http/1.1"],
+              certificates: [
+                {certificateFile: ($cert_dir + "/fullchain.pem"), keyFile: ($cert_dir + "/privkey.pem")}
+              ]
+            }
+          },
+          sniffing: {enabled: $sniff, destOverride: ["http","tls"]}
+        },
+        {
+          tag: "reality",
+          listen: "0.0.0.0",
+          port: $reality_port,
+          protocol: "vless",
+          settings: {clients: [{id: $reality_uuid, flow: "xtls-rprx-vision"}], decryption: "none"},
+          streamSettings: {
+            network: "tcp",
+            security: "reality",
+            realitySettings: {
+              show: false,
+              dest: $dest,
+              xver: 0,
+              serverNames: $serverNames,
+              privateKey: $privateKey,
+              shortIds: $shortIds,
+              spiderX: "/"
+            }
+          },
+          sniffing: {enabled: $sniff, destOverride: ["http","tls","quic"]}
+        }
+      ]
+    }' | io::atomic_write "${release_dir}/${XRAY_CONFIG_05_INBOUNDS}" 0640
 
   core::log debug "vision-reality inbounds config written" "$(printf '{"vision_port":%d,"reality_port":%d}' \
     "${XRAY_VISION_PORT}" "${XRAY_REALITY_PORT}")"

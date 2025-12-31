@@ -31,32 +31,101 @@ setup() {
 
   # Define helper functions inline (extracted from configure.sh)
   # We don't source configure.sh directly because it has main() at the end
+  xray::sanitize_json_string() {
+    local value="${1:-}" field="${2:-value}" sanitized
+
+    sanitized="${value//$'\r'/}"
+    sanitized="${sanitized//$'\n'/}"
+
+    if [[ "${sanitized}" =~ [\"{}] ]]; then
+      core::log error "unsafe characters in input" "$(printf '{"field":"%s"}' "${field}")"
+      return "${ERR_INVALID_ARG}"
+    fi
+
+    printf '%s' "${sanitized}"
+  }
+
   json_array_from_csv() {
-    local IFS=','
-    read -ra items <<< "${1}"
-    local json_output="["
-    for item in "${items[@]}"; do
-      item="$(echo "${item}" | xargs)"
-      [[ -n "${item}" ]] && json_output="${json_output}\"${item}\","
+    local csv="${1}" field="${2:-value}" first_ref_name="${3:-}"
+    local IFS=',' raw_items=() sanitized_items=()
+    read -ra raw_items <<< "${csv}"
+
+    local item trimmed sanitized first_assigned="false"
+    for item in "${raw_items[@]}"; do
+      IFS=$' \t\n' read -r trimmed <<< "${item}"
+      [[ -z "${trimmed}" ]] && continue
+      if ! validators::hostname "${trimmed}"; then
+        core::log error "invalid host entry" "$(printf '{"field":"%s","value":"%s"}' "${field}" "${trimmed//\"/\\\"}")"
+        return "${ERR_INVALID_ARG}"
+      fi
+      if ! sanitized="$(xray::sanitize_json_string "${trimmed}" "${field}")"; then
+        return "${ERR_INVALID_ARG}"
+      fi
+      if [[ -n "${first_ref_name}" && "${first_assigned}" == "false" ]]; then
+        printf -v "${first_ref_name}" '%s' "${sanitized}"
+        first_assigned="true"
+      fi
+      sanitized_items+=("${sanitized}")
     done
-    printf '%s' "${json_output%,}]"
+
+    if [[ "${#sanitized_items[@]}" -eq 0 ]]; then
+      printf '[]'
+      return 0
+    fi
+
+    printf '%s\n' "${sanitized_items[@]}" | jq -R . | jq -s .
   }
 
   ensure_reality_dest() {
     local dest="${1}" sni="${2}"
-    if [[ -z "${dest}" ]]; then dest="${sni%%,*}"; fi
-    dest="$(echo "${dest}" | xargs)"
-    if [[ "${dest}" != *:* ]]; then dest="${dest}:443"; fi
-    printf '%s' "${dest}"
+    IFS=$' \t\n' read -r dest <<< "${dest}"
+    [[ -z "${dest}" ]] && dest="${sni}"
+
+    if [[ -z "${dest}" ]]; then
+      core::log error "reality destination required" "{}"
+      return "${ERR_INVALID_ARG}"
+    fi
+
+    local sanitized
+    if ! sanitized="$(xray::sanitize_json_string "${dest}" "XRAY_REALITY_DEST")"; then
+      return "${ERR_INVALID_ARG}"
+    fi
+
+    local host port
+    if [[ "${sanitized}" == *:* ]]; then
+      host="${sanitized%%:*}"
+      port="${sanitized##*:}"
+    else
+      host="${sanitized}"
+      port="443"
+    fi
+
+    if ! validators::hostname "${host}"; then
+      core::log error "invalid destination host" "$(printf '{"host":"%s"}' "${host//\"/\\\"}")"
+      return "${ERR_INVALID_ARG}"
+    fi
+
+    if ! validators::port "${port}"; then
+      core::log error "invalid destination port" "$(printf '{"port":"%s"}' "${port}")"
+      return "${ERR_INVALID_ARG}"
+    fi
+
+    printf '%s:%s' "${host}" "${port}"
   }
 
   build_shortids_pool() {
     local primary="${1}" secondary="${2:-}" tertiary="${3:-}"
-    local pool="[\"\",\"${primary}\""
-    [[ -n "${secondary}" ]] && pool="${pool},\"${secondary}\""
-    [[ -n "${tertiary}" ]] && pool="${pool},\"${tertiary}\""
-    pool="${pool}]"
-    printf '%s' "${pool}"
+
+    if ! validators::shortid "${primary}" || ! validators::shortid "${secondary}" || ! validators::shortid "${tertiary}"; then
+      core::log error "invalid shortId provided" "{}"
+      return "${ERR_INVALID_ARG}"
+    fi
+
+    jq -n --arg primary "${primary}" --arg secondary "${secondary}" --arg tertiary "${tertiary}" '
+      ["", $primary]
+      + (if $secondary != "" then [$secondary] else [] end)
+      + (if $tertiary != "" then [$tertiary] else [] end)
+    '
   }
 
   verify_tls_certificates() {
@@ -137,28 +206,50 @@ teardown() {
 # === json_array_from_csv Tests ===
 
 @test "json_array_from_csv converts single value" {
-  result="$(json_array_from_csv "value1")"
-  [ "${result}" = '["value1"]' ]
+  result="$(json_array_from_csv "example.com")"
+  [ "$(echo "${result}" | jq -c '.')" = '["example.com"]' ]
 }
 
 @test "json_array_from_csv converts multiple values" {
-  result="$(json_array_from_csv "value1,value2,value3")"
-  [ "${result}" = '["value1","value2","value3"]' ]
+  result="$(json_array_from_csv "example.com,test.com,demo.com")"
+  [ "$(echo "${result}" | jq -c '.')" = '["example.com","test.com","demo.com"]' ]
 }
 
 @test "json_array_from_csv handles spaces" {
-  result="$(json_array_from_csv "value1, value2, value3")"
-  [ "${result}" = '["value1","value2","value3"]' ]
+  result="$(json_array_from_csv "example.com, test.com, demo.com")"
+  [ "$(echo "${result}" | jq -c '.')" = '["example.com","test.com","demo.com"]' ]
 }
 
 @test "json_array_from_csv handles empty input" {
   result="$(json_array_from_csv "")"
-  [ "${result}" = '[]' ]
+  [ "$(echo "${result}" | jq -c '.')" = '[]' ]
 }
 
 @test "json_array_from_csv handles SNI list" {
   result="$(json_array_from_csv "www.microsoft.com,www.apple.com")"
-  [ "${result}" = '["www.microsoft.com","www.apple.com"]' ]
+  [ "$(echo "${result}" | jq -c '.')" = '["www.microsoft.com","www.apple.com"]' ]
+}
+
+@test "xray::sanitize_json_string strips newlines" {
+  result="$(xray::sanitize_json_string "line1
+line2" "test")"
+  [ "${result}" = "line1line2" ]
+}
+
+@test "xray::sanitize_json_string rejects braces" {
+  run xray::sanitize_json_string "{bad}" "test"
+  [ "${status}" -ne 0 ]
+}
+
+@test "json_array_from_csv populates first reference" {
+  local first_value=""
+  json_array_from_csv "www.microsoft.com,www.apple.com" "XRAY_SNI" first_value >/dev/null
+  [ "${first_value}" = "www.microsoft.com" ]
+}
+
+@test "json_array_from_csv rejects malicious host" {
+  run json_array_from_csv "good.com,evil\".com"
+  [ "${status}" -ne 0 ]
 }
 
 # === ensure_reality_dest Tests ===
@@ -178,11 +269,6 @@ teardown() {
   [ "${result}" = "custom.server.com:443" ]
 }
 
-@test "ensure_reality_dest uses first SNI when CSV provided" {
-  result="$(ensure_reality_dest "" "www.microsoft.com,www.apple.com")"
-  [ "${result}" = "www.microsoft.com:443" ]
-}
-
 @test "ensure_reality_dest preserves custom port" {
   result="$(ensure_reality_dest "custom.server.com:8443" "www.microsoft.com")"
   [ "${result}" = "custom.server.com:8443" ]
@@ -193,36 +279,46 @@ teardown() {
   [ "${result}" = "custom.server.com:443" ]
 }
 
+@test "ensure_reality_dest rejects malicious input" {
+  run ensure_reality_dest "bad\"host" "www.microsoft.com"
+  [ "${status}" -ne 0 ]
+}
+
 # === build_shortids_pool Tests ===
 
 @test "build_shortids_pool with single shortId" {
   result="$(build_shortids_pool "abc123def456")"
-  [ "${result}" = '["","abc123def456"]' ]
+  [ "$(echo "${result}" | jq -c '.')" = '["","abc123def456"]' ]
 }
 
 @test "build_shortids_pool with two shortIds" {
   result="$(build_shortids_pool "abc123def456" "111222333444")"
-  [ "${result}" = '["","abc123def456","111222333444"]' ]
+  [ "$(echo "${result}" | jq -c '.')" = '["","abc123def456","111222333444"]' ]
 }
 
 @test "build_shortids_pool with three shortIds" {
   result="$(build_shortids_pool "abc123def456" "111222333444" "555666777888")"
-  [ "${result}" = '["","abc123def456","111222333444","555666777888"]' ]
+  [ "$(echo "${result}" | jq -c '.')" = '["","abc123def456","111222333444","555666777888"]' ]
 }
 
 @test "build_shortids_pool always includes empty string first" {
-  result="$(build_shortids_pool "test1234")"
-  [[ "${result}" == '["","'* ]]
+  result="$(build_shortids_pool "abcd1234")"
+  [[ "$(echo "${result}" | jq -c '. | .[0]')" == '""' ]]
 }
 
 @test "build_shortids_pool ignores empty secondary" {
   result="$(build_shortids_pool "abc123def456" "")"
-  [ "${result}" = '["","abc123def456"]' ]
+  [ "$(echo "${result}" | jq -c '.')" = '["","abc123def456"]' ]
 }
 
 @test "build_shortids_pool ignores empty tertiary" {
   result="$(build_shortids_pool "abc123def456" "111222333444" "")"
-  [ "${result}" = '["","abc123def456","111222333444"]' ]
+  [ "$(echo "${result}" | jq -c '.')" = '["","abc123def456","111222333444"]' ]
+}
+
+@test "build_shortids_pool rejects invalid shortId" {
+  run build_shortids_pool "badshortid!" "" ""
+  [ "${status}" -ne 0 ]
 }
 
 # === verify_tls_certificates Tests ===

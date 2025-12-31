@@ -330,6 +330,26 @@ teardown() {
   [ "$status" -ne 0 ]
 }
 
+@test "validators::hostname - accepts domain" {
+  run validators::hostname "example.com"
+  [ "$status" -eq 0 ]
+}
+
+@test "validators::hostname - rejects empty" {
+  run validators::hostname ""
+  [ "$status" -ne 0 ]
+}
+
+@test "validators::hostname - rejects unsafe characters" {
+  run validators::hostname "bad\"host"
+  [ "$status" -ne 0 ]
+}
+
+@test "validators::hostname - rejects invalid domain" {
+  run validators::hostname "bad_host"
+  [ "$status" -ne 0 ]
+}
+
 # Security tests - RFC 3927 link-local addresses
 @test "validators::domain - rejects RFC 3927 link-local start (169.254.0.1)" {
   run validators::domain "169.254.0.1"
