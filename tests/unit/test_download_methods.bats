@@ -198,15 +198,15 @@ create_fake_tarball() {
 @test "download::with_fallback - succeeds with git clone" {
   # Create a real git repo
   cd "${TEST_REPO_DIR}"
-  git init >/dev/null 2>&1
-  git config user.email "test@example.com"
-  git config user.name "Test"
-  git config commit.gpgsign false
+  command git init >/dev/null 2>&1
+  command git config user.email "test@example.com"
+  command git config user.name "Test"
+  command git config commit.gpgsign false
   mkdir -p bin
   echo "#!/bin/bash" > bin/xrf
   chmod +x bin/xrf
-  git add .
-  git commit -m "initial" >/dev/null 2>&1
+  command git add .
+  command git commit -m "initial" >/dev/null 2>&1
   cd - >/dev/null
 
   # Test with real git clone

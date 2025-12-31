@@ -23,6 +23,13 @@ VERSION=""
 PLUGINS=""
 DEBUG=""
 PROXY=""
+ALLOW_UNSIGNED_TAG="${XRF_ALLOW_UNSIGNED_TAG:-false}"
+EXPECTED_COMMIT=""
+DOWNLOAD_COMMIT=""
+TARBALL_ROOT_DIR=""
+INTEGRITY_VERIFIED="false"
+REF_TYPE="heads"
+REQUIRE_SIGNED_TAG="false"
 
 SYMLINK_PATH="/usr/local/bin/xrf"
 INSTALL_DIR_PREEXISTING="false"
@@ -132,8 +139,8 @@ cleanup() {
     kill "${SPINNER_PID}" 2> /dev/null || true
     wait "${SPINNER_PID}" 2> /dev/null || true
   fi
-  # Clean up temp directory
-  [[ -n "${TMP_DIR:-}" && -d "${TMP_DIR}" ]] && rm -rf "${TMP_DIR}"
+  # Clean up temp directory (|| true prevents false condition from affecting exit code)
+  [[ -n "${TMP_DIR:-}" && -d "${TMP_DIR}" ]] && rm -rf "${TMP_DIR}" || true
 }
 
 trap cleanup EXIT
@@ -243,6 +250,7 @@ args::init() {
   VERSION="latest"
   PLUGINS=""
   DEBUG="false"
+  ALLOW_UNSIGNED_TAG="${XRF_ALLOW_UNSIGNED_TAG:-false}"
 }
 
 # Parse command line arguments
@@ -271,6 +279,10 @@ args::parse() {
       --proxy)
         PROXY="${2:-}"
         shift 2
+        ;;
+      --allow-unsigned-release|--allow-unsigned-tag)
+        ALLOW_UNSIGNED_TAG="true"
+        shift
         ;;
       --install-dir)
         INSTALL_DIR="${2:-}"
@@ -412,6 +424,7 @@ Options:
   --plugins, -p <list>          Comma-separated list of plugins to enable
   --proxy <url>                 Use proxy for downloads
   --install-dir <path>          Installation directory (default: /usr/local/xray-fusion)
+  --allow-unsigned-release      Skip required GPG verification for tagged releases
   --debug                       Enable debug output
   --help, -h                    Show this help
 
@@ -474,6 +487,11 @@ setup_environment() {
   # Set debug mode
   if [[ "${DEBUG}" == "true" ]]; then
     export XRF_DEBUG="true"
+  fi
+
+  REF_TYPE="$(detect_ref_type "${BRANCH}")"
+  if [[ "$(is_tagged_ref "${BRANCH}")" == "true" && "${ALLOW_UNSIGNED_TAG}" != "true" ]]; then
+    REQUIRE_SIGNED_TAG="true"
   fi
 }
 
@@ -577,11 +595,145 @@ install_dependencies() {
   fi
 }
 
+is_tagged_ref() {
+  local ref="${1:-}"
+  [[ "${ref}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z]+)?$ ]] && echo "true" && return 0
+  echo "false"
+  return 0
+}
+
+detect_ref_type() {
+  local ref="${1:-}"
+  if [[ "$(is_tagged_ref "${ref}")" == "true" ]]; then
+    echo "tags"
+    return 0
+  fi
+  echo "heads"
+}
+
+extract_commit_from_tar_root() {
+  local root_name="${1:-}"
+  [[ "${root_name}" =~ -([0-9a-fA-F]{40})$ ]] || return 1
+  echo "${BASH_REMATCH[1]}"
+  return 0
+}
+
+extract_repo_slug() {
+  local url="${1:-}"
+  if [[ "${url}" =~ github\.com[:/]+([^/]+)/([^/.]+)(\.git)?$ ]]; then
+    echo "${BASH_REMATCH[1]}/${BASH_REMATCH[2]}"
+    return 0
+  fi
+  return 1
+}
+
+fetch_expected_commit() {
+  if [[ -n "${EXPECTED_COMMIT}" ]]; then
+    return 0
+  fi
+
+  if [[ -n "${XRF_EXPECTED_COMMIT:-}" ]]; then
+    EXPECTED_COMMIT="${XRF_EXPECTED_COMMIT}"
+    if [[ ! "${EXPECTED_COMMIT}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+      log_error "Invalid XRF_EXPECTED_COMMIT format; must be 40-hex commit hash"
+      return 1
+    fi
+    return 0
+  fi
+
+  local slug
+  if ! slug="$(extract_repo_slug "${REPO_URL}")"; then
+    log_error "XRF_EXPECTED_COMMIT is required when repository is not hosted on GitHub"
+    return 1
+  fi
+
+  local api_url="https://api.github.com/repos/${slug}/commits/${BRANCH}"
+  local response=""
+  log_info "Fetching expected commit from GitHub API (${BRANCH})"
+
+  if command -v curl > /dev/null 2>&1; then
+    response="$(curl -fsSL "${api_url}" 2> /dev/null || true)"
+  elif command -v wget > /dev/null 2>&1; then
+    response="$(wget -qO- "${api_url}" 2> /dev/null || true)"
+  else
+    log_error "No HTTP client available to fetch expected commit (need curl or wget)"
+    return 1
+  fi
+
+  EXPECTED_COMMIT="$(echo "${response}" | grep -m1 -oE '\"sha\"\\s*:\\s*\"[0-9a-f]{40}\"' | head -1 | grep -oE '[0-9a-f]{40}' || true)"
+  if [[ ! "${EXPECTED_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+    log_error "Failed to determine expected commit from GitHub API"
+    log_error "Set XRF_EXPECTED_COMMIT manually to continue after verifying the correct hash"
+    return 1
+  fi
+
+  log_info "Expected commit: ${EXPECTED_COMMIT}"
+  return 0
+}
+
+enforce_integrity_checks() {
+  local repo_dir="${1:-}"
+  local actual_commit="${2:-}"
+  local expected_commit="${3:-}"
+  local require_signature="${4:-false}"
+
+  if [[ -z "${expected_commit}" ]]; then
+    log_error "Missing expected commit for verification (set XRF_EXPECTED_COMMIT or ensure GitHub API is reachable)"
+    return 1
+  fi
+
+  if [[ -z "${actual_commit}" ]]; then
+    log_error "Unable to determine downloaded commit hash for verification"
+    log_error "Ensure git metadata is available or retry with git-based download"
+    return 1
+  fi
+
+  if [[ "${actual_commit,,}" != "${expected_commit,,}" ]]; then
+    log_error "Download integrity verification failed: commit hash mismatch"
+    log_error "Expected: ${expected_commit}"
+    log_error "Actual: ${actual_commit}"
+    return 1
+  fi
+
+  log_info "✓ Commit verification passed"
+
+  if [[ "${require_signature}" == "true" ]]; then
+    if [[ ! -d "${repo_dir}/.git" ]]; then
+      log_error "GPG verification required for tagged release but git metadata is missing"
+      log_error "Install with git available or use --allow-unsigned-release to bypass"
+      return 1
+    fi
+
+    if ! command -v gpg > /dev/null 2>&1; then
+      log_error "GPG verification required for tagged release but gpg is not installed"
+      log_error "Install gnupg or rerun with --allow-unsigned-release to bypass"
+      return 1
+    fi
+
+    if git -C "${repo_dir}" verify-commit "${actual_commit}" > /dev/null 2>&1; then
+      log_info "✓ GPG signature verification passed (tagged release)"
+    else
+      log_error "GPG verification failed or missing signatures for tagged release ${BRANCH}"
+      log_error "If you trust this source, rerun with --allow-unsigned-release"
+      return 1
+    fi
+  else
+    if [[ -d "${repo_dir}/.git" ]] && command -v gpg > /dev/null 2>&1; then
+      if git -C "${repo_dir}" verify-commit "${actual_commit}" > /dev/null 2>&1; then
+        log_info "✓ GPG signature verification passed"
+      else
+        log_debug "GPG signature verification failed or commit not signed (optional check)"
+      fi
+    fi
+  fi
+
+  return 0
+}
+
 # Download xray-fusion
 download_project() {
   log_info "Downloading xray-fusion from ${REPO_URL} (branch: ${BRANCH})..."
 
-  TMP_DIR="$(mktemp -d)"
   log_debug "Using temporary directory: ${TMP_DIR}"
 
   # Set proxy if specified
@@ -610,8 +762,9 @@ download_project() {
 
   # Fallback to tarball if git failed
   if [[ "${download_success}" == "false" ]]; then
-    local tarball_url="${REPO_URL%.git}/archive/refs/heads/${BRANCH}.tar.gz"
+    local tarball_url="${REPO_URL%.git}/archive/refs/${REF_TYPE}/${BRANCH}.tar.gz"
     local tarball="${TMP_DIR}/archive.tar.gz"
+    local tar_root=""
 
     log_debug "Downloading tarball: ${tarball_url}"
 
@@ -639,12 +792,14 @@ download_project() {
 
     # Extract tarball if downloaded
     if [[ "${download_success}" == "true" ]]; then
+      tar_root=$(tar -tzf "${tarball}" | head -1 | cut -d/ -f1 2> /dev/null || true)
       log_debug "Extracting tarball..."
       if tar -xzf "${tarball}" -C "${TMP_DIR}" 2> /dev/null; then
         # Rename extracted directory
         mv "${TMP_DIR}/xray-fusion-${BRANCH}" "${TMP_DIR}/xray-fusion" 2> /dev/null \
           || mv "${TMP_DIR}"/xray-fusion-* "${TMP_DIR}/xray-fusion" 2> /dev/null
         rm -f "${tarball}"
+        TARBALL_ROOT_DIR="${tar_root}"
       else
         log_error "tarball extraction failed"
         rm -f "${tarball}"
@@ -664,39 +819,24 @@ download_project() {
   # Security: Verify BEFORE executing any downloaded code to prevent MITM attacks
 
   # 1. Get actual commit hash (uses only system git, no downloaded code)
-  local actual_commit=""
+  if ! fetch_expected_commit; then
+    error_exit "Unable to determine expected commit for verification"
+  fi
+
+  DOWNLOAD_COMMIT=""
   if [[ -d "${TMP_DIR}/xray-fusion/.git" ]]; then
-    actual_commit=$(git -C "${TMP_DIR}/xray-fusion" rev-parse HEAD 2> /dev/null || true)
-    if [[ -n "${actual_commit}" ]]; then
-      log_debug "Downloaded commit: ${actual_commit}"
+    DOWNLOAD_COMMIT="$(git -C "${TMP_DIR}/xray-fusion" rev-parse HEAD 2> /dev/null || true)"
+  elif [[ -n "${TARBALL_ROOT_DIR}" ]]; then
+    if ! DOWNLOAD_COMMIT="$(extract_commit_from_tar_root "${TARBALL_ROOT_DIR}")"; then
+      DOWNLOAD_COMMIT=""
     fi
   fi
+  log_debug "Downloaded commit: ${DOWNLOAD_COMMIT:-unknown}"
 
-  # 2. Verify against expected commit (if provided)
-  if [[ -n "${XRF_EXPECTED_COMMIT:-}" && -n "${actual_commit}" ]]; then
-    log_info "Verifying download integrity..."
-    if [[ "${actual_commit,,}" != "${XRF_EXPECTED_COMMIT,,}" ]]; then
-      log_error "Download integrity verification failed: commit hash mismatch"
-      log_error "Expected: ${XRF_EXPECTED_COMMIT}"
-      log_error "Actual: ${actual_commit}"
-      error_exit "Integrity verification failed (possible MITM attack)"
-    fi
-    log_info "✓ Commit verification passed"
-  else
-    if [[ -n "${actual_commit}" ]]; then
-      log_debug "Skipping commit verification (XRF_EXPECTED_COMMIT not set)"
-      log_debug "To enable verification, set: export XRF_EXPECTED_COMMIT='${actual_commit}'"
-    fi
+  if ! enforce_integrity_checks "${TMP_DIR}/xray-fusion" "${DOWNLOAD_COMMIT}" "${EXPECTED_COMMIT}" "${REQUIRE_SIGNED_TAG}"; then
+    error_exit "Integrity verification failed (commit/GPG)"
   fi
-
-  # 3. Verify GPG signature (optional)
-  if [[ -d "${TMP_DIR}/xray-fusion/.git" ]] && command -v gpg > /dev/null 2>&1; then
-    if git -C "${TMP_DIR}/xray-fusion" verify-commit HEAD 2> /dev/null; then
-      log_info "✓ GPG signature verification passed"
-    else
-      log_debug "GPG signature verification failed or commit not signed (optional check)"
-    fi
-  fi
+  INTEGRITY_VERIFIED="true"
 
   # === END: Verification ===
   # Note: Removed sourcing of lib/download.sh - all verification logic is self-contained
@@ -795,6 +935,11 @@ run_xray_install() {
 
   # Change to installation directory
   cd "${INSTALL_DIR}"
+
+  if [[ "${INTEGRITY_VERIFIED}" != "true" ]]; then
+    cleanup_partial_installation
+    error_exit "Integrity checks did not complete successfully; aborting execution of xrf"
+  fi
 
   # Run installation with unified arguments
   if "./bin/xrf" install "${install_args[@]}"; then
@@ -949,4 +1094,6 @@ EOF
 }
 
 # Run main function with all arguments
-main "${@}"
+if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi
