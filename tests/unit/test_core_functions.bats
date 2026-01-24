@@ -236,3 +236,325 @@ teardown() {
   echo "$output" | grep -q '"level":"info"'
   echo "$output" | grep -q '"msg":".*caddy-cert-sync.*test message"'
 }
+
+# =============================================================================
+# core::init() tests
+# =============================================================================
+
+@test "core::init - sets strict mode (set -euo pipefail)" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    # Check that errexit is set
+    [[ $- == *e* ]] || exit 1
+    # Check that nounset is set
+    [[ $- == *u* ]] || exit 1
+    # Check that pipefail is set
+    shopt -o pipefail &>/dev/null || exit 1
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "core::init - sets XRF_JSON=false by default" {
+  run bash -c '
+    unset XRF_JSON
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    echo "${XRF_JSON}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "false" ]]
+}
+
+@test "core::init - sets XRF_DEBUG=false by default" {
+  run bash -c '
+    unset XRF_DEBUG
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    echo "${XRF_DEBUG}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "false" ]]
+}
+
+@test "core::init - parses --json flag" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init --json
+    echo "${XRF_JSON}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "true" ]]
+}
+
+@test "core::init - parses --debug flag" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init --debug
+    echo "${XRF_DEBUG}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "true" ]]
+}
+
+@test "core::init - parses both --json and --debug flags" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init --json --debug
+    echo "JSON=${XRF_JSON} DEBUG=${XRF_DEBUG}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "JSON=true DEBUG=true" ]]
+}
+
+@test "core::init - ignores unknown flags" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init --unknown --json --other-flag
+    echo "${XRF_JSON}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "true" ]]
+}
+
+@test "core::init - preserves existing XRF_JSON value when not overridden" {
+  run bash -c '
+    export XRF_JSON=true
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    echo "${XRF_JSON}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "true" ]]
+}
+
+@test "core::init - preserves existing XRF_DEBUG value when not overridden" {
+  run bash -c '
+    export XRF_DEBUG=true
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    echo "${XRF_DEBUG}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "true" ]]
+}
+
+@test "core::init - sets up ERR trap" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    trap -p ERR | grep -q "core::error_handler"
+  '
+  [ "$status" -eq 0 ]
+}
+
+@test "core::init - works with no arguments" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    echo "success"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "success" ]]
+}
+
+@test "core::init - flags can appear in any order" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init some-arg --debug other-arg --json
+    echo "JSON=${XRF_JSON} DEBUG=${XRF_DEBUG}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == "JSON=true DEBUG=true" ]]
+}
+
+# =============================================================================
+# core::error_handler() tests
+# =============================================================================
+
+@test "core::error_handler - logs critical message with return code" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    # Call error handler directly (normally called by trap)
+    core::error_handler 42 100 "failed_command" 2>&1 || true
+  '
+  # Note: error_handler exits, so we check output
+  [[ "${output}" == *"ERR trap"* ]]
+  [[ "${output}" == *'"rc":42'* ]]
+  [[ "${output}" == *'"line":100'* ]]
+}
+
+@test "core::error_handler - includes command in log" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    core::error_handler 1 50 "some_failing_cmd --flag" 2>&1 || true
+  '
+  [[ "${output}" == *"some_failing_cmd"* ]]
+}
+
+@test "core::error_handler - exits with provided return code" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    core::error_handler 123 10 "test"
+  '
+  [ "$status" -eq 123 ]
+}
+
+@test "core::error_handler - logs in JSON format when XRF_JSON=true" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=true
+    export XRF_DEBUG=false
+    core::error_handler 1 25 "test_cmd" 2>&1 || true
+  '
+  [[ "${output}" == *'"level":"critical"'* ]]
+  [[ "${output}" == *'"msg":"ERR trap"'* ]]
+}
+
+@test "core::error_handler - uses CRITICAL level (uppercase in text mode)" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    core::error_handler 1 25 "test_cmd" 2>&1 || true
+  '
+  [[ "${output}" == *"CRITICAL"* ]]
+}
+
+@test "core::error_handler - handles special characters in command" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    core::error_handler 1 50 "echo \$VAR | grep pattern" 2>&1 || true
+  '
+  [ "$status" -eq 1 ]
+  [[ "${output}" == *"ERR trap"* ]]
+}
+
+# =============================================================================
+# ERR trap integration tests
+# =============================================================================
+
+@test "ERR trap triggers on command failure" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    export XRF_JSON=false
+    false  # This should trigger the ERR trap
+  ' 2>&1
+  [ "$status" -ne 0 ]
+  [[ "${output}" == *"ERR trap"* ]]
+}
+
+@test "ERR trap includes line number" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    export XRF_JSON=false
+    false  # line 5
+  ' 2>&1
+  [ "$status" -ne 0 ]
+  [[ "${output}" == *'"line":'* ]]
+}
+
+@test "ERR trap preserves original exit code" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    export XRF_JSON=false
+    exit 77
+  '
+  [ "$status" -eq 77 ]
+}
+
+@test "ERR trap includes failed command" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    core::init
+    export XRF_JSON=false
+    /nonexistent/command 2>/dev/null
+  ' 2>&1
+  [ "$status" -ne 0 ]
+  [[ "${output}" == *'"cmd":'* ]]
+}
+
+# =============================================================================
+# core::log additional edge cases
+# =============================================================================
+
+@test "core::log - fatal level exits with code 1" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    core::log fatal "fatal error message"
+  '
+  [ "$status" -eq 1 ]
+  [[ "${output}" == *"fatal error message"* ]]
+}
+
+@test "core::log - critical level does not exit" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    core::log critical "critical error"
+    echo "still running"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"critical error"* ]]
+  [[ "${output}" == *"still running"* ]]
+}
+
+@test "core::log - handles empty context" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    core::log info "message with no context"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"message with no context"* ]]
+}
+
+@test "core::log - handles empty {} context in JSON mode" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=true
+    export XRF_DEBUG=false
+    core::log info "test" "{}"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *'"ctx":{}'* ]]
+}
+
+@test "core::log - warn level works correctly" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    core::log warn "warning message"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"warn"* ]]
+  [[ "${output}" == *"warning message"* ]]
+}
+
+@test "core::log - error level works correctly" {
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+    core::log error "error message"
+  '
+  [ "$status" -eq 0 ]
+  [[ "${output}" == *"error"* ]]
+  [[ "${output}" == *"error message"* ]]
+}
