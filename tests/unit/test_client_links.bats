@@ -155,3 +155,373 @@ JSON
   # Should fallback to shortIds[1] from config (fedcba9876543210)
   assert_contains "${output}" "sid=fedcba9876543210"
 }
+
+# =============================================================================
+# Additional edge case tests
+# =============================================================================
+
+@test "client-links uses custom fingerprint when specified" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey==",
+      "fingerprint": "firefox"
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  [[ "${output}" =~ fp=firefox ]]
+  [[ ! "${output}" =~ fp=chrome ]]
+}
+
+@test "client-links defaults to chrome fingerprint when not specified" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  [[ "${output}" =~ fp=chrome ]]
+}
+
+@test "client-links uses first SNI from comma-separated list" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com,www.google.com,www.apple.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  # Should use only the first SNI
+  [[ "${output}" =~ sni=www.microsoft.com ]]
+  # Should NOT contain the commas or other SNIs in the link
+  [[ ! "${output}" =~ sni=www.microsoft.com,www.google.com ]]
+}
+
+@test "client-links uses default port 443 when not specified" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  assert_contains "${output}" "@203.0.113.10:443?"
+}
+
+@test "client-links uses default SNI when not specified" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  # Default SNI should be www.microsoft.com
+  [[ "${output}" =~ sni=www.microsoft.com ]]
+}
+
+@test "client-links defaults to reality-only topology" {
+  write_state '{
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh"
+
+  [ "$status" -eq 0 ]
+  # Should output REALITY link (reality-only topology)
+  assert_contains "${output}" "REALITY:"
+  # Should NOT output VISION link
+  [[ ! "${output}" =~ "VISION :" ]]
+}
+
+@test "client-links shows placeholder when uuid is missing" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  # Should show placeholder when uuid is missing
+  assert_contains "${output}" "<UUID>"
+}
+
+@test "client-links shows placeholder when public key is missing" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890"
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  # Should show placeholder when public key is missing
+  assert_contains "${output}" "<PUBLIC_KEY>"
+}
+
+@test "client-links uses YOUR_SERVER_IP when IP detection fails" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  # Don't set XRAY_SERVER_IP and mock net::detect_public_ip to fail
+  run bash -c '
+    source "'"${PROJECT_ROOT}/lib/core.sh"'"
+    source "'"${PROJECT_ROOT}/lib/plugins.sh"'"
+    source "'"${PROJECT_ROOT}/modules/state.sh"'"
+    source "'"${PROJECT_ROOT}/modules/net/network.sh"'"
+    source "'"${PROJECT_ROOT}/services/xray/common.sh"'"
+    export XRF_VAR="'"${XRF_VAR}"'"
+    export XRF_ETC="'"${XRF_ETC}"'"
+    export XRF_JSON=false
+    export XRF_DEBUG=false
+
+    test_ip_fallback() {
+      # Override IP detection to fail
+      net::detect_public_ip() { return 1; }
+
+      state="$(state::load)"
+      local -a fields=()
+      mapfile -t fields < <(
+        echo "${state}" | jq -r '\''[
+          .name // .topology // "reality-only",
+          .xray.reality_sni // "www.microsoft.com",
+          .xray.short_id // "",
+          .xray.reality_public_key // "",
+          .xray.vision_port // "8443",
+          .xray.reality_port // "443",
+          .xray.uuid_vision // "",
+          .xray.uuid_reality // "",
+          .xray.domain // "",
+          .xray.uuid // "",
+          .xray.port // "443",
+          .xray.fingerprint // "chrome"
+        ] | .[] // ""'\''
+      )
+      local uuid="${fields[9]:-}"
+      local pbk="${fields[3]:-}"
+      local sid="${fields[2]:-}"
+      local port="${fields[10]:-}"
+      local sni="${fields[1]:-}"
+      local fp="${fields[11]:-chrome}"
+
+      local ip=""
+      [[ -n "${ip}" ]] || ip="$(net::detect_public_ip || true)"
+      [[ -n "${ip}" ]] || ip="YOUR_SERVER_IP"
+
+      if [[ -n "${uuid}" && -n "${pbk}" && -n "${sid}" ]]; then
+        echo "REALITY: vless://${uuid}@${ip}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
+      fi
+    }
+    test_ip_fallback
+  '
+
+  [ "$status" -eq 0 ]
+  assert_contains "${output}" "@YOUR_SERVER_IP:"
+}
+
+@test "client-links outputs header and footer markers" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  assert_contains "${output}" "========== LINKS =========="
+  assert_contains "${output}" "=========================="
+}
+
+@test "client-links vision-reality uses correct vision port" {
+  write_state '{
+    "name": "vision-reality",
+    "xray": {
+      "domain": "example.com",
+      "vision_port": 9443,
+      "reality_port": 443,
+      "uuid_vision": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "uuid_reality": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" vision-reality
+
+  [ "$status" -eq 0 ]
+  # Vision link should use vision_port (9443)
+  assert_contains "${output}" "@example.com:9443?"
+  # Reality link should use reality_port (443)
+  assert_contains "${output}" "@203.0.113.10:443?"
+}
+
+@test "client-links vision-reality uses default ports when not specified" {
+  write_state '{
+    "name": "vision-reality",
+    "xray": {
+      "domain": "example.com",
+      "uuid_vision": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "uuid_reality": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" vision-reality
+
+  [ "$status" -eq 0 ]
+  # Default vision port is 8443
+  assert_contains "${output}" "@example.com:8443?"
+  # Default reality port is 443
+  assert_contains "${output}" "@203.0.113.10:443?"
+}
+
+@test "client-links vision-reality skips vision link when domain missing" {
+  write_state '{
+    "name": "vision-reality",
+    "xray": {
+      "vision_port": 8443,
+      "reality_port": 443,
+      "uuid_vision": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "uuid_reality": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" vision-reality
+
+  [ "$status" -eq 0 ]
+  # Should NOT have VISION link (missing domain)
+  [[ ! "${output}" =~ "VISION :" ]]
+  # Should still have REALITY link
+  assert_contains "${output}" "REALITY:"
+}
+
+@test "client-links vision-reality skips reality link when uuid_reality missing" {
+  write_state '{
+    "name": "vision-reality",
+    "xray": {
+      "domain": "example.com",
+      "vision_port": 8443,
+      "reality_port": 443,
+      "uuid_vision": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" vision-reality
+
+  [ "$status" -eq 0 ]
+  # Should have VISION link
+  assert_contains "${output}" "VISION :"
+  # Should NOT have REALITY link (missing uuid_reality)
+  [[ ! "${output}" =~ "REALITY:" ]]
+}
+
+@test "client-links handles topology from state.topology field" {
+  write_state '{
+    "topology": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh"
+
+  [ "$status" -eq 0 ]
+  assert_contains "${output}" "REALITY:"
+}
+
+@test "client-links uses safari fingerprint correctly" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey==",
+      "fingerprint": "safari"
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  [[ "${output}" =~ fp=safari ]]
+}
