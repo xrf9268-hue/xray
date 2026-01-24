@@ -67,88 +67,163 @@ create_temp_repo() {
 
 # =============================================================================
 # Architecture detection tests
+# These tests exercise the actual install.sh code by:
+# 1. Sourcing install.sh dependencies and extracting xray::install function
+# 2. Mocking uname to return test architectures
+# 3. Mocking curl to capture the URL constructed by xray::install
 # =============================================================================
 
 @test "xray::install - detects x86_64 architecture correctly" {
   run bash -c '
-    source "'"${PROJECT_ROOT}/lib/core.sh"'"
-    export XRF_JSON=false
-    export XRF_DEBUG=false
-    arch_u="x86_64"
-    case "${arch_u}" in
-      x86_64 | amd64) url_tmpl="Xray-linux-64.zip" ;;
-      aarch64 | arm64) url_tmpl="Xray-linux-arm64-v8a.zip" ;;
-      *) exit 2 ;;
-    esac
-    echo "${url_tmpl}"
+    export XRF_JSON=false XRF_DEBUG=false
+    HERE="'"${PROJECT_ROOT}"'"
+
+    # Mock uname to return test architecture
+    uname() { [[ "${1:-}" == "-m" ]] && echo "x86_64" || command uname "$@"; }
+
+    # Source dependencies manually (install.sh uses HERE)
+    source "${HERE}/lib/core.sh"
+    source "${HERE}/modules/io.sh"
+    source "${HERE}/modules/user/user.sh"
+    source "${HERE}/services/xray/common.sh"
+    source "${HERE}/services/xray/install_utils.sh"
+
+    # Define need() from install.sh
+    need() { command -v "${1}" > /dev/null 2>&1 || exit 3; }
+
+    # Extract and eval the xray::install function from the real install.sh
+    eval "$(sed -n '\''/^xray::install()/,/^}$/p'\'' "${HERE}/services/xray/install.sh")"
+
+    # Mock curl to capture the URL and exit early
+    curl() {
+      for arg in "$@"; do
+        if [[ "${arg}" =~ Xray-linux ]]; then
+          echo "${arg}"
+          exit 0
+        fi
+      done
+      echo "mock"
+    }
+
+    xray::install "v1.0.0" 2>/dev/null
   '
   [ "$status" -eq 0 ]
-  [[ "${output}" == "Xray-linux-64.zip" ]]
+  [[ "${output}" =~ "Xray-linux-64.zip" ]]
 }
 
 @test "xray::install - detects amd64 architecture correctly" {
   run bash -c '
-    source "'"${PROJECT_ROOT}/lib/core.sh"'"
-    export XRF_JSON=false
-    export XRF_DEBUG=false
-    arch_u="amd64"
-    case "${arch_u}" in
-      x86_64 | amd64) url_tmpl="Xray-linux-64.zip" ;;
-      aarch64 | arm64) url_tmpl="Xray-linux-arm64-v8a.zip" ;;
-      *) exit 2 ;;
-    esac
-    echo "${url_tmpl}"
+    export XRF_JSON=false XRF_DEBUG=false
+    HERE="'"${PROJECT_ROOT}"'"
+
+    uname() { [[ "${1:-}" == "-m" ]] && echo "amd64" || command uname "$@"; }
+
+    source "${HERE}/lib/core.sh"
+    source "${HERE}/modules/io.sh"
+    source "${HERE}/modules/user/user.sh"
+    source "${HERE}/services/xray/common.sh"
+    source "${HERE}/services/xray/install_utils.sh"
+
+    need() { command -v "${1}" > /dev/null 2>&1 || exit 3; }
+    eval "$(sed -n '\''/^xray::install()/,/^}$/p'\'' "${HERE}/services/xray/install.sh")"
+
+    curl() {
+      for arg in "$@"; do
+        if [[ "${arg}" =~ Xray-linux ]]; then
+          echo "${arg}"
+          exit 0
+        fi
+      done
+      echo "mock"
+    }
+
+    xray::install "v1.0.0" 2>/dev/null
   '
   [ "$status" -eq 0 ]
-  [[ "${output}" == "Xray-linux-64.zip" ]]
+  [[ "${output}" =~ "Xray-linux-64.zip" ]]
 }
 
 @test "xray::install - detects aarch64 architecture correctly" {
   run bash -c '
-    source "'"${PROJECT_ROOT}/lib/core.sh"'"
-    export XRF_JSON=false
-    export XRF_DEBUG=false
-    arch_u="aarch64"
-    case "${arch_u}" in
-      x86_64 | amd64) url_tmpl="Xray-linux-64.zip" ;;
-      aarch64 | arm64) url_tmpl="Xray-linux-arm64-v8a.zip" ;;
-      *) exit 2 ;;
-    esac
-    echo "${url_tmpl}"
+    export XRF_JSON=false XRF_DEBUG=false
+    HERE="'"${PROJECT_ROOT}"'"
+
+    uname() { [[ "${1:-}" == "-m" ]] && echo "aarch64" || command uname "$@"; }
+
+    source "${HERE}/lib/core.sh"
+    source "${HERE}/modules/io.sh"
+    source "${HERE}/modules/user/user.sh"
+    source "${HERE}/services/xray/common.sh"
+    source "${HERE}/services/xray/install_utils.sh"
+
+    need() { command -v "${1}" > /dev/null 2>&1 || exit 3; }
+    eval "$(sed -n '\''/^xray::install()/,/^}$/p'\'' "${HERE}/services/xray/install.sh")"
+
+    curl() {
+      for arg in "$@"; do
+        if [[ "${arg}" =~ Xray-linux ]]; then
+          echo "${arg}"
+          exit 0
+        fi
+      done
+      echo "mock"
+    }
+
+    xray::install "v1.0.0" 2>/dev/null
   '
   [ "$status" -eq 0 ]
-  [[ "${output}" == "Xray-linux-arm64-v8a.zip" ]]
+  [[ "${output}" =~ "Xray-linux-arm64-v8a.zip" ]]
 }
 
 @test "xray::install - detects arm64 architecture correctly" {
   run bash -c '
-    source "'"${PROJECT_ROOT}/lib/core.sh"'"
-    export XRF_JSON=false
-    export XRF_DEBUG=false
-    arch_u="arm64"
-    case "${arch_u}" in
-      x86_64 | amd64) url_tmpl="Xray-linux-64.zip" ;;
-      aarch64 | arm64) url_tmpl="Xray-linux-arm64-v8a.zip" ;;
-      *) exit 2 ;;
-    esac
-    echo "${url_tmpl}"
+    export XRF_JSON=false XRF_DEBUG=false
+    HERE="'"${PROJECT_ROOT}"'"
+
+    uname() { [[ "${1:-}" == "-m" ]] && echo "arm64" || command uname "$@"; }
+
+    source "${HERE}/lib/core.sh"
+    source "${HERE}/modules/io.sh"
+    source "${HERE}/modules/user/user.sh"
+    source "${HERE}/services/xray/common.sh"
+    source "${HERE}/services/xray/install_utils.sh"
+
+    need() { command -v "${1}" > /dev/null 2>&1 || exit 3; }
+    eval "$(sed -n '\''/^xray::install()/,/^}$/p'\'' "${HERE}/services/xray/install.sh")"
+
+    curl() {
+      for arg in "$@"; do
+        if [[ "${arg}" =~ Xray-linux ]]; then
+          echo "${arg}"
+          exit 0
+        fi
+      done
+      echo "mock"
+    }
+
+    xray::install "v1.0.0" 2>/dev/null
   '
   [ "$status" -eq 0 ]
-  [[ "${output}" == "Xray-linux-arm64-v8a.zip" ]]
+  [[ "${output}" =~ "Xray-linux-arm64-v8a.zip" ]]
 }
 
 @test "xray::install - rejects unsupported architecture" {
   run bash -c '
-    source "'"${PROJECT_ROOT}/lib/core.sh"'"
-    export XRF_JSON=false
-    export XRF_DEBUG=false
-    arch_u="armv7l"
-    case "${arch_u}" in
-      x86_64 | amd64) url_tmpl="Xray-linux-64.zip" ;;
-      aarch64 | arm64) url_tmpl="Xray-linux-arm64-v8a.zip" ;;
-      *) exit 2 ;;
-    esac
-    echo "${url_tmpl}"
+    export XRF_JSON=false XRF_DEBUG=false
+    HERE="'"${PROJECT_ROOT}"'"
+
+    uname() { [[ "${1:-}" == "-m" ]] && echo "armv7l" || command uname "$@"; }
+
+    source "${HERE}/lib/core.sh"
+    source "${HERE}/modules/io.sh"
+    source "${HERE}/modules/user/user.sh"
+    source "${HERE}/services/xray/common.sh"
+    source "${HERE}/services/xray/install_utils.sh"
+
+    need() { command -v "${1}" > /dev/null 2>&1 || exit 3; }
+    eval "$(sed -n '\''/^xray::install()/,/^}$/p'\'' "${HERE}/services/xray/install.sh")"
+
+    xray::install "v1.0.0" 2>/dev/null
   '
   [ "$status" -eq 2 ]
 }

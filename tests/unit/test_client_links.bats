@@ -322,56 +322,29 @@ JSON
     }
   }'
 
-  # Don't set XRAY_SERVER_IP and mock net::detect_public_ip to fail
+  # Run the actual client-links.sh with mocked IP detection
+  # Pre-source network.sh to set the guard, then override net::detect_public_ip.
+  # When client-links.sh sources network.sh, the guard prevents re-sourcing,
+  # so our mock persists.
   run bash -c '
-    source "'"${PROJECT_ROOT}/lib/core.sh"'"
-    source "'"${PROJECT_ROOT}/lib/plugins.sh"'"
-    source "'"${PROJECT_ROOT}/modules/state.sh"'"
-    source "'"${PROJECT_ROOT}/modules/net/network.sh"'"
-    source "'"${PROJECT_ROOT}/services/xray/common.sh"'"
     export XRF_VAR="'"${XRF_VAR}"'"
     export XRF_ETC="'"${XRF_ETC}"'"
     export XRF_JSON=false
     export XRF_DEBUG=false
 
-    test_ip_fallback() {
-      # Override IP detection to fail
-      net::detect_public_ip() { return 1; }
+    # Pre-source network module to establish the source guard
+    source "'"${PROJECT_ROOT}/modules/net/network.sh"'"
 
-      state="$(state::load)"
-      local -a fields=()
-      mapfile -t fields < <(
-        echo "${state}" | jq -r '\''[
-          .name // .topology // "reality-only",
-          .xray.reality_sni // "www.microsoft.com",
-          .xray.short_id // "",
-          .xray.reality_public_key // "",
-          .xray.vision_port // "8443",
-          .xray.reality_port // "443",
-          .xray.uuid_vision // "",
-          .xray.uuid_reality // "",
-          .xray.domain // "",
-          .xray.uuid // "",
-          .xray.port // "443",
-          .xray.fingerprint // "chrome"
-        ] | .[] // ""'\''
-      )
-      local uuid="${fields[9]:-}"
-      local pbk="${fields[3]:-}"
-      local sid="${fields[2]:-}"
-      local port="${fields[10]:-}"
-      local sni="${fields[1]:-}"
-      local fp="${fields[11]:-chrome}"
+    # Override IP detection to return empty string (simulating failure)
+    net::detect_public_ip() { echo ""; }
 
-      local ip=""
-      [[ -n "${ip}" ]] || ip="$(net::detect_public_ip || true)"
-      [[ -n "${ip}" ]] || ip="YOUR_SERVER_IP"
+    # Do NOT set XRAY_SERVER_IP to test the fallback path
+    unset XRAY_SERVER_IP 2>/dev/null || true
 
-      if [[ -n "${uuid}" && -n "${pbk}" && -n "${sid}" ]]; then
-        echo "REALITY: vless://${uuid}@${ip}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
-      fi
-    }
-    test_ip_fallback
+    # Run the actual client-links.sh script
+    # It will use our mocked net::detect_public_ip because the source guard
+    # in network.sh prevents re-sourcing
+    source "'"${PROJECT_ROOT}/services/xray/client-links.sh"'" reality-only
   '
 
   [ "$status" -eq 0 ]
