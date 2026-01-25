@@ -15,7 +15,7 @@
 #
 # Security:
 #   - Validates file existence before processing (prevent TOCTOU)
-#   - Only processes .sh files (prevent unintended execution)
+#   - Only processes .sh and .bats files (prevent unintended execution)
 ##
 
 set -euo pipefail
@@ -39,8 +39,8 @@ if [[ -z "${file}" ]]; then
   exit 0
 fi
 
-# Only process shell scripts (.sh extension or install.sh)
-if [[ ! "${file}" =~ \.sh$ ]] && [[ "${file}" != *"/install.sh" ]]; then
+# Only process shell scripts (.sh, .bats extension)
+if [[ ! "${file}" =~ \.(sh|bats)$ ]]; then
   echo '{"suppressOutput": true}' >&2
   exit 0
 fi
