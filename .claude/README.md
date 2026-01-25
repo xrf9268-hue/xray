@@ -147,7 +147,7 @@ A  tests/unit/test_new.bats
   # OR stash changes:
   git stash push -m 'WIP: description'
 
-{"approved": false, "reason": "Uncommitted changes detected - commit or stash before stopping"}
+{"decision": "block", "reason": "Uncommitted changes detected - commit or stash before stopping"}
 ```
 
 **Example Output** (warning scenario):
@@ -164,7 +164,7 @@ A  tests/unit/test_new.bats
   - .claude/README.md: Document new hooks or commands
 
 [Stop] ✓ Git status clean, safe to end session
-{"approved": true}
+{"decision": "allow"}
 ```
 
 **Security Benefits**:
@@ -332,8 +332,8 @@ if [ -f file ];then
 echo "test"
 fi' > /tmp/test.sh
 
-# Test hook
-echo '{"params":{"file_path":"/tmp/test.sh"}}' | \
+# Test hook (official PostToolUse stdin format)
+echo '{"tool_name":"Edit","tool_input":{"file_path":"/tmp/test.sh"}}' | \
   .claude/scripts/format-and-lint-shell.sh
 
 # Expected: File formatted and linted
