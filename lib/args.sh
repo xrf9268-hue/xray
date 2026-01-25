@@ -138,36 +138,12 @@ args::validate_topology() {
 # Domain validation
 args::validate_domain() {
   local domain="${1:-}"
-  if [[ -z "${domain}" ]]; then
-    return 0 # Domain is optional for reality-only
-  fi
+  [[ -z "${domain}" ]] && return 0 # Domain is optional for reality-only
 
   # Use shared validator (RFC compliant, length limits, internal domain check)
+  # Validator logs specific rejection reason via debug output
   if ! validators::domain "${domain}"; then
-    # Detect specific reason for failure
-    local reason=""
-    case "${domain}" in
-      localhost | *.local | 127.* | 0.0.0.0)
-        reason="loopback or local address"
-        ;;
-      10.* | 172.1[6-9].* | 172.2[0-9].* | 172.3[0-1].* | 192.168.*)
-        reason="RFC 1918 private IP address"
-        ;;
-      169.254.*)
-        reason="RFC 3927 link-local address"
-        ;;
-      *.test | *.invalid)
-        reason="RFC 6761 special-use domain name"
-        ;;
-      ::1 | fc* | fd* | fe80*)
-        reason="IPv6 private address"
-        ;;
-      *)
-        reason="invalid format or too long"
-        ;;
-    esac
-
-    error_codes::invalid_domain "${domain}" "${reason}"
+    error_codes::invalid_domain "${domain}" "see debug log for details"
     return 1
   fi
 

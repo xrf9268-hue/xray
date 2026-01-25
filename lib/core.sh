@@ -240,28 +240,21 @@ core::ensure_lock_writable() {
   # If file doesn't exist, nothing to fix
   [[ ! -f "${lock}" ]] && return 0
 
-  # Try to fix ownership first (may be root-owned from previous sudo run)
+  local has_sudo=false
+  command -v sudo > /dev/null 2>&1 && has_sudo=true
+
+  # Fix ownership (may be root-owned from previous sudo run)
   if ! chown "$(id -u):$(id -g)" "${lock}" 2> /dev/null; then
-    # Need sudo to change ownership
-    if command -v sudo > /dev/null 2>&1; then
-      sudo chown "$(id -u):$(id -g)" "${lock}" 2> /dev/null || {
-        core::log warn "cannot fix lock file ownership" "$(printf '{"lock":"%s"}' "${lock//\"/\\\"}")"
-        return 1
-      }
-    else
-      core::log warn "cannot fix lock file ownership (no sudo)" "$(printf '{"lock":"%s"}' "${lock//\"/\\\"}")"
+    if ! ${has_sudo} || ! sudo chown "$(id -u):$(id -g)" "${lock}" 2> /dev/null; then
+      core::log warn "cannot fix lock file ownership" "$(printf '{"lock":"%s"}' "${lock//\"/\\\"}")"
       return 1
     fi
   fi
 
   # Fix permissions (make writable)
   if ! chmod 0644 "${lock}" 2> /dev/null; then
-    if command -v sudo > /dev/null 2>&1; then
-      sudo chmod 0644 "${lock}" 2> /dev/null || {
-        core::log warn "cannot fix lock file permissions" "$(printf '{"lock":"%s"}' "${lock//\"/\\\"}")"
-        return 1
-      }
-    else
+    if ! ${has_sudo} || ! sudo chmod 0644 "${lock}" 2> /dev/null; then
+      core::log warn "cannot fix lock file permissions" "$(printf '{"lock":"%s"}' "${lock//\"/\\\"}")"
       return 1
     fi
   fi

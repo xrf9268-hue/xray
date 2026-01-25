@@ -20,47 +20,20 @@ Usage: xrf <command>
   help        Show this help
 EOF
 }
-case "${1-}" in
-  install)
-    shift || true
-    "${HERE}/commands/install.sh" "$@"
-    ;;
-  status)
-    shift || true
-    "${HERE}/commands/status.sh" "$@"
-    ;;
-  uninstall)
-    shift || true
-    "${HERE}/commands/uninstall.sh" "$@"
-    ;;
-  links)
-    shift || true
-    "${HERE}/services/xray/client-links.sh" "$@"
-    ;;
-  logs)
-    shift || true
-    "${HERE}/commands/logs.sh" "$@"
-    ;;
-  backup)
-    shift || true
-    "${HERE}/commands/backup.sh" "$@"
-    ;;
-  test-sni)
-    shift || true
-    "${HERE}/commands/test-sni.sh" "$@"
-    ;;
-  health)
-    shift || true
-    "${HERE}/commands/health.sh" "$@"
-    ;;
-  templates)
-    shift || true
-    "${HERE}/commands/templates.sh" "$@"
-    ;;
-  plugin)
-    shift || true
-    "${HERE}/commands/plugin.sh" "$@"
-    ;;
+cmd="${1-}"
+shift || true
+
+case "${cmd}" in
+  install) "${HERE}/commands/install.sh" "$@" ;;
+  status) "${HERE}/commands/status.sh" "$@" ;;
+  uninstall) "${HERE}/commands/uninstall.sh" "$@" ;;
+  links) "${HERE}/services/xray/client-links.sh" "$@" ;;
+  logs) "${HERE}/commands/logs.sh" "$@" ;;
+  backup) "${HERE}/commands/backup.sh" "$@" ;;
+  test-sni) "${HERE}/commands/test-sni.sh" "$@" ;;
+  health) "${HERE}/commands/health.sh" "$@" ;;
+  templates) "${HERE}/commands/templates.sh" "$@" ;;
+  plugin) "${HERE}/commands/plugin.sh" "$@" ;;
   help | "") usage ;;
   *)
     usage

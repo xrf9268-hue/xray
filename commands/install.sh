@@ -94,12 +94,11 @@ main() {
     fi
 
     # Export Xray configuration from template (used later in configuration)
-    [[ -n "${TEMPLATE_SNI:-}" ]] && export XRAY_SNI="${TEMPLATE_SNI}"
-    [[ -n "${TEMPLATE_REALITY_DEST:-}" ]] && export XRAY_REALITY_DEST="${TEMPLATE_REALITY_DEST}"
-    [[ -n "${TEMPLATE_SNIFFING:-}" ]] && export XRAY_SNIFFING="${TEMPLATE_SNIFFING}"
-    [[ -n "${TEMPLATE_PORT:-}" ]] && export XRAY_PORT="${TEMPLATE_PORT}"
-    [[ -n "${TEMPLATE_VISION_PORT:-}" ]] && export XRAY_VISION_PORT="${TEMPLATE_VISION_PORT}"
-    [[ -n "${TEMPLATE_REALITY_PORT:-}" ]] && export XRAY_REALITY_PORT="${TEMPLATE_REALITY_PORT}"
+    local -a template_vars=(SNI REALITY_DEST SNIFFING PORT VISION_PORT REALITY_PORT)
+    for var in "${template_vars[@]}"; do
+      local tval="TEMPLATE_${var}" xval="XRAY_${var}"
+      [[ -n "${!tval:-}" ]] && export "${xval}=${!tval}"
+    done
 
     core::log info "template applied" "$(printf '{"template":"%s","topology":"%s"}' "${TEMPLATE}" "${TOPOLOGY}")"
   fi
@@ -207,22 +206,17 @@ main() {
     core::log info "SNI validation passed" "$(printf '{"domain":"%s"}' "${sni_domain}")"
   fi
 
-  # Generate shortIds pool (3-5 shortIds for multi-client scenarios)
-  # Uses xray::generate_shortids() for batch generation (performance optimization)
-  # Tries: xxd (simple) → od (POSIX) → openssl (fallback)
-
-  # Check if we need to generate any shortIds
-  if [[ -z "${XRAY_SHORT_ID:-}" && -z "${XRAY_SHORT_ID_2:-}" && -z "${XRAY_SHORT_ID_3:-}" ]]; then
-    # Batch generate all shortIds at once (3x faster than individual calls)
+  # Generate shortIds pool (3 shortIds for multi-client scenarios)
+  # Batch generate if none provided; fill missing ones individually otherwise
+  if [[ -z "${XRAY_SHORT_ID:-}${XRAY_SHORT_ID_2:-}${XRAY_SHORT_ID_3:-}" ]]; then
     mapfile -t shortids < <(xray::generate_shortids 3)
     XRAY_SHORT_ID="${shortids[0]}"
     XRAY_SHORT_ID_2="${shortids[1]}"
     XRAY_SHORT_ID_3="${shortids[2]}"
   else
-    # Fallback: generate missing shortIds individually (backward compatibility)
-    [[ -z "${XRAY_SHORT_ID:-}" ]] && XRAY_SHORT_ID="$(xray::generate_shortid)" || true
-    [[ -z "${XRAY_SHORT_ID_2:-}" ]] && XRAY_SHORT_ID_2="$(xray::generate_shortid)" || true
-    [[ -z "${XRAY_SHORT_ID_3:-}" ]] && XRAY_SHORT_ID_3="$(xray::generate_shortid)" || true
+    : "${XRAY_SHORT_ID:=$(xray::generate_shortid)}"
+    : "${XRAY_SHORT_ID_2:=$(xray::generate_shortid)}"
+    : "${XRAY_SHORT_ID_3:=$(xray::generate_shortid)}"
   fi
 
   # Validate all generated shortIds (hex format, even length, max 16 chars)
