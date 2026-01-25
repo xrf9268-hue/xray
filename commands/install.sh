@@ -173,7 +173,10 @@ main() {
 
   if [[ "${TOPOLOGY}" == "vision-reality" ]]; then
     core::log debug "configuring vision-reality topology" "$(printf '{"XRAY_DOMAIN":"%s"}' "${XRAY_DOMAIN:-unset}")"
-    : "${XRAY_VISION_PORT:=${DEFAULT_XRAY_VISION_PORT}}" : "${XRAY_REALITY_PORT:=${DEFAULT_XRAY_REALITY_PORT}}" : "${XRAY_CERT_DIR:=${DEFAULT_XRAY_CERT_DIR}}" : "${XRAY_FALLBACK_PORT:=${DEFAULT_XRAY_FALLBACK_PORT}}"
+    : "${XRAY_VISION_PORT:=${DEFAULT_XRAY_VISION_PORT}}"
+    : "${XRAY_REALITY_PORT:=${DEFAULT_XRAY_REALITY_PORT}}"
+    : "${XRAY_CERT_DIR:=${DEFAULT_XRAY_CERT_DIR}}"
+    : "${XRAY_FALLBACK_PORT:=${DEFAULT_XRAY_FALLBACK_PORT}}"
     if [[ -z "${XRAY_UUID_VISION:-}" ]]; then
       XRAY_UUID_VISION="${generated_uuid:-$(uuid::generate "$(xray::bin)")}"
     fi
