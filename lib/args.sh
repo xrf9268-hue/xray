@@ -142,7 +142,10 @@ args::validate_topology() {
 # Domain validation
 args::validate_domain() {
   local domain="${1:-}"
-  [[ -z "${domain}" ]] && return 0 # Domain is optional for reality-only
+
+  if [[ -z "${domain}" ]]; then
+    return 0 # Domain is optional for reality-only
+  fi
 
   # Use shared validator (RFC compliant, length limits, internal domain check)
   # Validator logs specific rejection reason via debug output
