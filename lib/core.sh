@@ -107,13 +107,10 @@ core::log_format() {
     display_lvl="${lvl^^}"
   fi
 
-  local ctx_trimmed="${ctx}"
-  ctx_trimmed="${ctx_trimmed#${ctx_trimmed%%[![:space:]]*}}"
-  ctx_trimmed="${ctx_trimmed%${ctx_trimmed##*[![:space:]]}}"
+  # Check if context is empty (whitespace-only or empty object)
   local ctx_is_empty="false"
-  if [[ -z "${ctx_trimmed}" || "${ctx_trimmed}" == "{}" ]]; then
-    ctx_is_empty="true"
-  fi
+  local ctx_trimmed="${ctx//[[:space:]]/}"
+  [[ -z "${ctx_trimmed}" || "${ctx_trimmed}" == "{}" ]] && ctx_is_empty="true"
 
   if [[ "${XRF_JSON}" == "true" ]]; then
     local json_ctx="${ctx}"
