@@ -15,7 +15,7 @@
 #   2 - Uncommitted changes detected, block stop
 #
 # Output:
-#   JSON with approved: true/false and optional reason
+#   JSON with decision: "block"/"allow" and optional reason (to stdout)
 ##
 
 set -euo pipefail
@@ -41,9 +41,9 @@ if ! git diff-index --quiet HEAD -- 2> /dev/null; then
   echo "  git stash push -m 'WIP: description'" >&2
   echo "" >&2
 
-  # Output JSON (official format)
-  echo '{"approved": false, "reason": "Uncommitted changes detected - commit or stash before stopping"}' >&2
-  exit 2 # Block stopping
+  # Output JSON to stdout (official format)
+  echo '{"decision": "block", "reason": "Uncommitted changes detected - commit or stash before stopping"}'
+  exit 0
 fi
 
 # Check for untracked files
@@ -88,5 +88,5 @@ fi
 
 # Clean git state - allow stop
 echo "[Stop] ✓ Git status clean, safe to end session" >&2
-echo '{"approved": true}' >&2
+echo '{"decision": "allow"}'
 exit 0

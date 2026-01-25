@@ -2,6 +2,10 @@
 # Lightweight plugin loader + event bus
 # NOTE: This file is sourced. Strict mode is set by the calling script or core::init()
 
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_PLUGINS_LOADED:-}" ]] && return 0
+readonly _XRF_PLUGINS_LOADED=1
+
 plugins::base() {
   local here
   here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"

@@ -3,6 +3,10 @@
 # NOTE: This file is sourced. Strict mode (set -euo pipefail) is set by core::init()
 #       which must be called by the main script.
 
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_CORE_LOADED:-}" ]] && return 0
+readonly _XRF_CORE_LOADED=1
+
 ##
 # Initialize strict mode and parse global flags
 #

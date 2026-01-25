@@ -15,39 +15,39 @@
 #
 # Security:
 #   - Validates file existence before processing (prevent TOCTOU)
-#   - Only processes .sh files (prevent unintended execution)
+#   - Only processes .sh and .bats files (prevent unintended execution)
 ##
 
 set -euo pipefail
 
 # Check jq availability (required for JSON parsing)
 if ! command -v jq > /dev/null 2>&1; then
-  echo '{"suppressOutput": true}' >&2
+  echo '{"suppressOutput": true}'
   exit 0
 fi
 
 # Read hook input from stdin (official format)
-# Example: {"params":{"file_path":"/path/to/file.sh"},"tool":"Edit"}
+# Example: {"tool_name":"Edit","tool_input":{"file_path":"/path/to/file.sh",...}}
 input=$(cat)
 
-# Extract file path (try both params.file_path and params.path)
-file=$(echo "${input}" | jq -r '.params.file_path // .params.path // empty')
+# Extract file path from tool_input (official PostToolUse format)
+file=$(echo "${input}" | jq -r '.tool_input.file_path // empty')
 
 # Validate file path exists
 if [[ -z "${file}" ]]; then
-  echo '{"suppressOutput": true}' >&2
+  echo '{"suppressOutput": true}'
   exit 0
 fi
 
-# Only process shell scripts (.sh extension or install.sh)
-if [[ ! "${file}" =~ \.sh$ ]] && [[ "${file}" != *"/install.sh" ]]; then
-  echo '{"suppressOutput": true}' >&2
+# Only process shell scripts (.sh, .bats extension)
+if [[ ! "${file}" =~ \.(sh|bats)$ ]]; then
+  echo '{"suppressOutput": true}'
   exit 0
 fi
 
 # Verify file exists (prevent TOCTOU - CWE-362)
 if [[ ! -f "${file}" ]]; then
-  echo '{"suppressOutput": true}' >&2
+  echo '{"suppressOutput": true}'
   exit 0
 fi
 

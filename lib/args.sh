@@ -3,6 +3,10 @@
 # Provides consistent parameter interface for both install.sh and xrf commands
 # NOTE: This file is sourced. Strict mode is set by the calling script or core::init()
 
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_ARGS_LOADED:-}" ]] && return 0
+readonly _XRF_ARGS_LOADED=1
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/defaults.sh
 . "${HERE}/lib/defaults.sh"

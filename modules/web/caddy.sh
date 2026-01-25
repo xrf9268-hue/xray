@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Caddy automatic TLS management module
 # Reference implementation: 233boy/Xray
+# NOTE: This file is sourced. Strict mode is set by the calling script or core::init()
+
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_CADDY_LOADED:-}" ]] && return 0
+readonly _XRF_CADDY_LOADED=1
 
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=lib/core.sh

@@ -2,6 +2,10 @@
 # Xray installation utilities
 # NOTE: This file is sourced. Strict mode is set by core::init() from the calling script
 
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_INSTALL_UTILS_LOADED:-}" ]] && return 0
+readonly _XRF_INSTALL_UTILS_LOADED=1
+
 ##
 # Extract SHA256 hash from .dgst file content
 #

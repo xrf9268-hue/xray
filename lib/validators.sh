@@ -3,6 +3,10 @@
 # Provides RFC-compliant validators for domains, ports, UUIDs, and other inputs
 # NOTE: This file is sourced. Strict mode is set by the calling script or core::init()
 
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_VALIDATORS_LOADED:-}" ]] && return 0
+readonly _XRF_VALIDATORS_LOADED=1
+
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=lib/core.sh
 . "${HERE}/lib/core.sh"

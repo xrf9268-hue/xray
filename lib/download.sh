@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # Download and verification utilities for xray-fusion
+# NOTE: This file is sourced. Strict mode is set by the calling script or core::init()
 
-set -euo pipefail
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_DOWNLOAD_LOADED:-}" ]] && return 0
+readonly _XRF_DOWNLOAD_LOADED=1
 
 ##
 # Verify git commit hash matches expected value
