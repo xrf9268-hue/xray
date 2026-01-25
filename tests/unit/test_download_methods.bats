@@ -31,9 +31,9 @@ create_fake_tarball() {
   echo "test content" > "${fake_repo}/README.md"
 
   # Create tarball
-  cd "${TEST_TMPDIR}"
+  cd "${TEST_TMPDIR}" || return 1
   tar -czf "${dest}" -C "${TEST_TMPDIR}" --transform "s|^fake-repo|xray-fusion-${branch}|" fake-repo
-  cd - >/dev/null
+  cd - >/dev/null || return 1
 }
 
 # ============================================================================
@@ -197,7 +197,7 @@ create_fake_tarball() {
 
 @test "download::with_fallback - succeeds with git clone" {
   # Create a real git repo
-  cd "${TEST_REPO_DIR}"
+  cd "${TEST_REPO_DIR}" || return 1
   command git init >/dev/null 2>&1
   command git config user.email "test@example.com"
   command git config user.name "Test"
@@ -207,7 +207,7 @@ create_fake_tarball() {
   chmod +x bin/xrf
   command git add .
   command git commit -m "initial" >/dev/null 2>&1
-  cd - >/dev/null
+  cd - >/dev/null || return 1
 
   # Test with real git clone
   run download::with_fallback "file://${TEST_REPO_DIR}" "${TEST_DOWNLOAD_DIR}" "master"
