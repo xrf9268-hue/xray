@@ -93,7 +93,6 @@ io::atomic_write() {
   # Use hidden prefix to prevent conflicts and mktemp XXXXXX for unpredictability
   tmp="$(mktemp -p "${dstdir}" .atomic-write.XXXXXX.tmp)" || return 1
 
-  local cleanup_tmp
   cleanup_tmp() {
     rm -f "${tmp}" 2> /dev/null || true
   }
