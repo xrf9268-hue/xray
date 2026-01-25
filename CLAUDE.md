@@ -80,4 +80,4 @@ Use Test-Driven Development:
 
 - [AGENTS.md](./AGENTS.md) - Technical reference and patterns
 - [docs/adr/](./docs/adr/) - Architecture Decision Records
-- [.claude/](./claude/) - Claude Code hooks and commands
+- [.claude/](./.claude/) - Claude Code hooks and commands
