@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 # Common Xray paths and utilities
 # NOTE: This file is sourced. Strict mode is set by core::init() from the calling script
+
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_XRAY_COMMON_LOADED:-}" ]] && return 0
+readonly _XRF_XRAY_COMMON_LOADED=1
+
 xray::prefix() { echo "${XRF_PREFIX:-/usr/local}"; }
 xray::etc() { echo "${XRF_ETC:-/usr/local/etc}"; }
 xray::confbase() { echo "$(xray::etc)/xray"; }

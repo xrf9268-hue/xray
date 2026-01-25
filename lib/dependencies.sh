@@ -1,6 +1,10 @@
 #!/usr/bin/env bash
 # Dependency checking utilities
-set -euo pipefail
+# NOTE: This file is sourced. Strict mode is set by the calling script or core::init()
+
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_DEPENDENCIES_LOADED:-}" ]] && return 0
+readonly _XRF_DEPENDENCIES_LOADED=1
 
 # Global cache for detected package manager (performance optimization)
 # Avoids repeated command -v checks across multiple function calls

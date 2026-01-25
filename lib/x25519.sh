@@ -1,5 +1,10 @@
 #!/usr/bin/env bash
 # X25519 key utilities shared across install and status workflows
+# NOTE: This file is sourced. Strict mode is set by the calling script or core::init()
+
+# Source guard: prevent double-sourcing
+[[ -n "${_XRF_X25519_LOADED:-}" ]] && return 0
+readonly _XRF_X25519_LOADED=1
 
 x25519::trim() {
   local value="${1-}"
