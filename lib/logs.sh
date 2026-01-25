@@ -259,19 +259,19 @@ logs::_format() {
     fi
 
     # Apply coloring
-    if [[ "${no_color}" != "true" ]]; then
-      # Color by level
-      if [[ "${line}" =~ [Ee]rror ]]; then
-        printf '%b%s%b\n' "${COLOR_RED}" "${line}" "${COLOR_RESET}"
-      elif [[ "${line}" =~ [Ww]arn ]]; then
-        printf '%b%s%b\n' "${COLOR_YELLOW}" "${line}" "${COLOR_RESET}"
-      elif [[ "${line}" =~ [Ii]nfo ]]; then
-        printf '%b%s%b\n' "${COLOR_GREEN}" "${line}" "${COLOR_RESET}"
-      elif [[ "${line}" =~ [Dd]ebug ]]; then
-        printf '%b%s%b\n' "${COLOR_GRAY}" "${line}" "${COLOR_RESET}"
-      else
-        printf '%s\n' "${line}"
-      fi
+    local color=""
+    if [[ "${line}" =~ [Ee]rror ]]; then
+      color="${COLOR_RED}"
+    elif [[ "${line}" =~ [Ww]arn ]]; then
+      color="${COLOR_YELLOW}"
+    elif [[ "${line}" =~ [Ii]nfo ]]; then
+      color="${COLOR_GREEN}"
+    elif [[ "${line}" =~ [Dd]ebug ]]; then
+      color="${COLOR_GRAY}"
+    fi
+
+    if [[ "${no_color}" != "true" && -n "${color}" ]]; then
+      printf '%b%s%b\n' "${color}" "${line}" "${COLOR_RESET}"
     else
       printf '%s\n' "${line}"
     fi

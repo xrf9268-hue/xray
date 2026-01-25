@@ -127,12 +127,20 @@ main() {
     fi
 
     # Format statistics output
+    local total_lines
+    local error_count
+    local warning_count
+    local info_count
+    total_lines="$(jq -r '.total_lines' <<< "${stats}")"
+    error_count="$(jq -r '.errors' <<< "${stats}")"
+    warning_count="$(jq -r '.warnings' <<< "${stats}")"
+    info_count="$(jq -r '.info' <<< "${stats}")"
     printf '\n📊 Log Statistics\n\n'
     printf 'Time range:  %s\n' "${since:-24 hours ago}"
-    printf 'Total lines: %s\n' "$(echo "${stats}" | jq -r '.total_lines')"
-    printf 'Errors:      %s\n' "$(echo "${stats}" | jq -r '.errors')"
-    printf 'Warnings:    %s\n' "$(echo "${stats}" | jq -r '.warnings')"
-    printf 'Info:        %s\n\n' "$(echo "${stats}" | jq -r '.info')"
+    printf 'Total lines: %s\n' "${total_lines}"
+    printf 'Errors:      %s\n' "${error_count}"
+    printf 'Warnings:    %s\n' "${warning_count}"
+    printf 'Info:        %s\n\n' "${info_count}"
 
   elif [[ -n "${export_file}" ]]; then
     # Export to file
