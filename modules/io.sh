@@ -93,27 +93,33 @@ io::atomic_write() {
   # Use hidden prefix to prevent conflicts and mktemp XXXXXX for unpredictability
   tmp="$(mktemp -p "${dstdir}" .atomic-write.XXXXXX.tmp)" || return 1
 
+  local cleanup_tmp
+  cleanup_tmp() {
+    rm -f "${tmp}" 2> /dev/null || true
+  }
+
   # Write content to temp file
   if ! cat > "${tmp}"; then
-    rm -f "${tmp}" 2> /dev/null || true
+    cleanup_tmp
     return 1
   fi
 
   # Move to final location
   if io::writable "${dstdir}"; then
     if ! mv -f "${tmp}" "${dst}"; then
-      rm -f "${tmp}" 2> /dev/null || true
+      cleanup_tmp
       return 1
     fi
     chmod "${mode}" "${dst}" || true
-  else
-    core::log warn "write needs sudo" "$(printf '{"file":"%s"}' "${dst}")"
-    if ! sudo mv -f "${tmp}" "${dst}"; then
-      rm -f "${tmp}" 2> /dev/null || true
-      return 1
-    fi
-    sudo chmod "${mode}" "${dst}" || true
+    return 0
   fi
+
+  core::log warn "write needs sudo" "$(printf '{"file":"%s"}' "${dst}")"
+  if ! sudo mv -f "${tmp}" "${dst}"; then
+    cleanup_tmp
+    return 1
+  fi
+  sudo chmod "${mode}" "${dst}" || true
 
   # Success - temp file has been moved
   return 0
