@@ -247,12 +247,10 @@ main() {
     fi
     XRAY_PRIVATE_KEY="${private_key}"
     XRAY_PUBLIC_KEY="${public_key}"
-    unset keypair private_key public_key
   elif [[ -n "${XRAY_PRIVATE_KEY:-}" && -z "${XRAY_PUBLIC_KEY:-}" && -x "$(xray::bin)" ]]; then
     local derived_public
     if derived_public="$(x25519::derive_public_key "$(xray::bin)" "${XRAY_PRIVATE_KEY}")"; then
       XRAY_PUBLIC_KEY="${derived_public}"
-      unset derived_public
     else
       core::log error "failed to derive public key from provided private key" '{"suggestion":"re-run: xray x25519"}'
       exit 1
