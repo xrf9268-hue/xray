@@ -6,6 +6,10 @@
 [[ -n "${_XRF_PLUGINS_LOADED:-}" ]] && return 0
 readonly _XRF_PLUGINS_LOADED=1
 
+HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# shellcheck source=lib/core.sh
+. "${HERE}/lib/core.sh"
+
 plugins::base() {
   local here
   here="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
@@ -25,13 +29,13 @@ plugins::validate_id() {
 
   # Check for valid characters only
   if [[ ! "${id}" =~ ^[a-zA-Z0-9_-]+$ ]]; then
-    echo "invalid plugin id: ${id}" >&2
+    core::log error "invalid plugin id" "$(printf '{"id":"%s","reason":"invalid characters"}' "${id}")"
     return 1
   fi
 
   # Check for path traversal patterns
   if [[ "${id}" =~ \.\.|\/ ]]; then
-    echo "invalid plugin id contains path traversal: ${id}" >&2
+    core::log error "invalid plugin id" "$(printf '{"id":"%s","reason":"path traversal detected"}' "${id}")"
     return 1
   fi
 
@@ -59,10 +63,10 @@ plugins::load_enabled() {
         __PLUG_IDS+=("${id}")
         __PLUG_META["${id}"]="${ver}|${desc}|${hooks}"
       else
-        printf 'Warning: Plugin %s missing XRF_PLUGIN_ID\n' "$(basename "${f}")" >&2
+        core::log warn "plugin missing XRF_PLUGIN_ID" "$(printf '{"file":"%s"}' "$(basename "${f}")")"
       fi
     else
-      printf 'Warning: Failed to load plugin %s\n' "$(basename "${f}")" >&2
+      core::log warn "failed to load plugin" "$(printf '{"file":"%s"}' "$(basename "${f}")")"
     fi
     # Clear plugin variables for next iteration
     unset XRF_PLUGIN_ID XRF_PLUGIN_VERSION XRF_PLUGIN_DESC XRF_PLUGIN_HOOKS

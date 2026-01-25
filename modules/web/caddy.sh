@@ -50,24 +50,34 @@ caddy::install() {
   tmpdir="$(mktemp -d)"
   tmpfile="${tmpdir}/caddy.tar.gz"
 
-  # Store tmpdir in a global variable for trap cleanup
-  _CADDY_TMPDIR="${tmpdir}"
-  trap 'rm -rf "${_CADDY_TMPDIR:-}" 2>/dev/null || true; unset _CADDY_TMPDIR' EXIT
+  # Explicit cleanup function (no EXIT trap in utility functions - see AGENTS.md)
+  _caddy_cleanup() {
+    rm -rf "${tmpdir}" 2> /dev/null || true
+  }
 
   local url="https://github.com/caddyserver/caddy/releases/download/${version}/caddy_${version:1}_linux_${arch}.tar.gz"
 
   core::log info "downloading caddy" "$(printf '{"version":"%s","arch":"%s"}' "${version}" "${arch}")"
-  curl -fsSL "${url}" -o "${tmpfile}" || {
+  if ! curl -fsSL "${url}" -o "${tmpfile}"; then
     core::log error "download failed" "$(printf '{"url":"%s"}' "${url}")"
+    _caddy_cleanup
     return 1
-  }
+  fi
 
-  tar -xzf "${tmpfile}" -C "${tmpdir}" caddy || {
+  if ! tar -xzf "${tmpfile}" -C "${tmpdir}" caddy; then
     core::log error "extract failed" "{}"
+    _caddy_cleanup
     return 1
-  }
+  fi
 
-  io::install_file "${tmpdir}/caddy" "$(caddy::bin)" 0755
+  if ! io::install_file "${tmpdir}/caddy" "$(caddy::bin)" 0755; then
+    core::log error "install failed" "$(printf '{"bin":"%s"}' "$(caddy::bin)")"
+    _caddy_cleanup
+    return 1
+  fi
+
+  # Success - clean up temp directory
+  _caddy_cleanup
   core::log info "caddy installed" "$(printf '{"bin":"%s","version":"%s"}' "$(caddy::bin)" "${version}")"
 }
 
