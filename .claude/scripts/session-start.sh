@@ -39,6 +39,12 @@ echo "[SessionStart] Web/iOS environment detected, auto-installing development t
 mkdir -p "${HOME}/.local/bin" "${HOME}/.local/share"
 export PATH="${HOME}/.local/bin:${PATH}"
 
+# Persist PATH for subsequent commands via CLAUDE_ENV_FILE
+if [[ -n "${CLAUDE_ENV_FILE:-}" ]]; then
+  echo "export PATH=\"\${HOME}/.local/bin:\${PATH}\"" >> "${CLAUDE_ENV_FILE}"
+  echo "[SessionStart] PATH persisted to CLAUDE_ENV_FILE" >&2
+fi
+
 # Helper function to install tool
 install_tool() {
   local name="${1}"
