@@ -505,11 +505,15 @@ deploy_with_lock() {
 main() {
   core::init "${@}"
   local topology="reality-only"
-  while [[ $# -gt 0 ]]; do case "${1}" in --topology)
-    topology="${2}"
-    shift 2
-    ;;
-  *) shift ;; esac done
+  while [[ $# -gt 0 ]]; do
+    case "${1}" in
+      --topology)
+        topology="${2}"
+        shift 2
+        ;;
+      *) shift ;;
+    esac
+  done
 
   # Security: Validate topology parameter
   case "${topology}" in
