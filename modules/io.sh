@@ -28,15 +28,19 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 #   io::ensure_dir "/etc/app" "0750"        # Create with 0750
 ##
 io::ensure_dir() {
-  local dir="${1}" mode="${2:-0755}"
-  [[ -d "${dir}" ]] && {
+  local dir="${1}"
+  local mode="${2:-0755}"
+
+  if [[ -d "${dir}" ]]; then
     chmod "${mode}" "${dir}" || true
     return 0
-  }
-  mkdir -p "${dir}" 2> /dev/null || {
+  fi
+
+  if ! mkdir -p "${dir}" 2> /dev/null; then
     core::log warn "mkdir fallback sudo" "$(printf '{"dir":"%s"}' "${dir}")"
     sudo mkdir -p "${dir}"
-  }
+  fi
+
   chmod "${mode}" "${dir}" || true
 }
 
@@ -85,7 +89,8 @@ io::writable() { test -w "${1}" 2> /dev/null; }
 #   cat file.txt | io::atomic_write "/var/lib/app/data"
 ##
 io::atomic_write() {
-  local dst="${1}" mode="${2:-0644}"
+  local dst="${1}"
+  local mode="${2:-0644}"
   local dstdir tmp
   dstdir="$(dirname "${dst}")"
 

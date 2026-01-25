@@ -9,10 +9,21 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 # shellcheck source=modules/io.sh
 . "${HERE}/modules/io.sh"
 
-state::dir() { echo "${XRF_VAR:-/var/lib/xray-fusion}"; }
-state::path() { echo "$(state::dir)/state.json"; }
-state::digest() { echo "$(state::dir)/config.sha256"; }
-state::lock() { echo "$(state::dir)/locks/configure.lock"; }
+state::dir() {
+  printf '%s\n' "${XRF_VAR:-/var/lib/xray-fusion}"
+}
+
+state::path() {
+  printf '%s\n' "$(state::dir)/state.json"
+}
+
+state::digest() {
+  printf '%s\n' "$(state::dir)/config.sha256"
+}
+
+state::lock() {
+  printf '%s\n' "$(state::dir)/locks/configure.lock"
+}
 
 state::save() {
   local j="${1}"

@@ -110,7 +110,9 @@ error_codes::invalid_domain() {
   local specific_reason="${2:-}"
 
   local reason="Domain '${domain}' is invalid"
-  [[ -n "${specific_reason}" ]] && reason="${reason}: ${specific_reason}"
+  if [[ -n "${specific_reason}" ]]; then
+    reason="${reason}: ${specific_reason}"
+  fi
 
   local resolution="Use a public domain name for vision-reality topology, or switch to reality-only topology which doesn't require a domain."
 
@@ -159,7 +161,9 @@ error_codes::missing_parameter() {
   local context="${2:-}"
 
   local reason="Required parameter '--${param}' is missing"
-  [[ -n "${context}" ]] && reason="${reason} for ${context}"
+  if [[ -n "${context}" ]]; then
+    reason="${reason} for ${context}"
+  fi
 
   local resolution="Provide the --${param} parameter or choose a different configuration"
 
@@ -195,7 +199,9 @@ error_codes::port_conflict() {
   local process="${2:-unknown}"
 
   local reason="Port ${port} is already in use"
-  [[ "${process}" != "unknown" ]] && reason="${reason} by ${process}"
+  if [[ "${process}" != "unknown" ]]; then
+    reason="${reason} by ${process}"
+  fi
 
   local resolution="Stop the conflicting service or use a different port"
 
