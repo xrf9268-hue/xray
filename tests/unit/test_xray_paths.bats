@@ -294,8 +294,8 @@ teardown() {
   mapfile -t shortids < <(xray::generate_shortids 5)
 
   # Compare all pairs
-  for ((i=0; i<5; i++)); do
-    for ((j=i+1; j<5; j++)); do
+  for ((i = 0; i < 5; i++)); do
+    for ((j = i + 1; j < 5; j++)); do
       [ "${shortids[$i]}" != "${shortids[$j]}" ]
     done
   done
@@ -325,19 +325,19 @@ teardown() {
 @test "xray::generate_shortids - rejects invalid count" {
   run xray::generate_shortids 0
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "ERROR: invalid count" ]]
+  [[ "$output" =~ error.*"invalid count" ]]
 }
 
 @test "xray::generate_shortids - rejects negative count" {
   run xray::generate_shortids -1
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "ERROR: invalid count" ]]
+  [[ "$output" =~ error.*"invalid count" ]]
 }
 
 @test "xray::generate_shortids - rejects non-numeric count" {
   run xray::generate_shortids abc
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "ERROR: invalid count" ]]
+  [[ "$output" =~ error.*"invalid count" ]]
 }
 
 @test "xray::generate_shortids - handles count=1" {
