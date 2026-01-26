@@ -6,6 +6,9 @@
 [[ -n "${_XRF_XRAY_COMMON_LOADED:-}" ]] && return 0
 readonly _XRF_XRAY_COMMON_LOADED=1
 
+HERE="${HERE:-$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)}"
+. "${HERE}/lib/core.sh"
+
 xray::prefix() { echo "${XRF_PREFIX:-/usr/local}"; }
 xray::etc() { echo "${XRF_ETC:-/usr/local/etc}"; }
 xray::confbase() { echo "$(xray::etc)/xray"; }
@@ -41,7 +44,7 @@ xray::generate_shortid() {
     result="$(openssl rand -hex 8)"
   else
     # This should never happen as openssl is a project dependency
-    echo "ERROR: no suitable tool found for shortId generation" >&2
+    core::log error "no suitable tool found for shortId generation" "{}"
     return 1
   fi
 
@@ -77,7 +80,7 @@ xray::generate_shortids() {
 
   # Validate count
   if ! [[ "${count}" =~ ^[0-9]+$ ]] || [[ "${count}" -lt 1 ]]; then
-    echo "ERROR: invalid count for shortId generation: ${count}" >&2
+    core::log error "invalid count for shortId generation" "$(printf '{"count":"%s"}' "${count}")"
     return 1
   fi
 
@@ -100,7 +103,7 @@ xray::generate_shortids() {
       openssl rand -hex 8
     done
   else
-    echo "ERROR: no suitable tool found for shortId generation" >&2
+    core::log error "no suitable tool found for shortId generation" "{}"
     return 1
   fi
 

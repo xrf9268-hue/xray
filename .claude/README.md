@@ -126,8 +126,8 @@ In lib/core.sh line 45:
 4. **Recent activity** → **REMINDS** about documentation updates
 
 **Behavior**:
-- **Blocking**: Prevents ending if uncommitted changes exist (exit 2)
-- **Warning**: Allows ending but warns about unpushed commits (exit 0)
+- **Blocking**: Prevents ending if uncommitted changes exist (JSON: `{"decision": "block", "reason": "..."}`)
+- **Warning**: Allows ending but warns about unpushed commits (JSON: `{}`)
 - **Helpful**: Provides clear remediation steps
 
 **Script**: `.claude/scripts/stop-hook-git-check.sh`
@@ -164,7 +164,7 @@ A  tests/unit/test_new.bats
   - .claude/README.md: Document new hooks or commands
 
 [Stop] ✓ Git status clean, safe to end session
-{"decision": "allow"}
+{}
 ```
 
 **Security Benefits**:
@@ -345,13 +345,13 @@ cat /tmp/test.sh
 ```bash
 # Test with clean state
 git status  # Verify clean
-echo '{}' | .claude/scripts/stop-hook-git-check.sh
-# Expected: "Git status clean, safe to end session" (exit 0)
+CLAUDE_PROJECT_DIR="$(pwd)" .claude/scripts/stop-hook-git-check.sh
+# Expected: "Git status clean, safe to end session" + JSON: {}
 
 # Test with uncommitted changes
 echo "test" >> README.md
-echo '{}' | .claude/scripts/stop-hook-git-check.sh
-# Expected: "Uncommitted changes detected" (exit 2)
+CLAUDE_PROJECT_DIR="$(pwd)" .claude/scripts/stop-hook-git-check.sh
+# Expected: "Uncommitted changes detected" + JSON: {"decision": "block", "reason": "..."}
 git checkout README.md
 ```
 
@@ -517,8 +517,8 @@ When adding new hooks or commands:
 - Read stdin once (avoid race conditions)
 - Provide clear, actionable output
 - Handle missing tools gracefully
-- Exit 0 for non-blocking, exit 2 for blocking
-- Use JSON output for blocking scenarios
+- Always exit 0; use JSON `{"decision": "block", "reason": "..."}` for blocking
+- Allow scenarios: output `{}` or empty JSON
 
 **Command Development Guidelines**:
 - Include YAML frontmatter with description

@@ -10,12 +10,11 @@
 #   2. Check for unpushed commits (WARNS if found)
 #   3. Remind to update CLAUDE.md/AGENTS.md if needed
 #
-# Exit Codes:
-#   0 - Clean git state, allow stop
-#   2 - Uncommitted changes detected, block stop
+# Exit Code: Always 0 (use JSON for decision control)
 #
-# Output:
-#   JSON with decision: "block"/"allow" and optional reason (to stdout)
+# Output (stdout JSON):
+#   Block:  {"decision": "block", "reason": "..."}
+#   Allow:  {}
 ##
 
 set -euo pipefail
@@ -88,5 +87,5 @@ fi
 
 # Clean git state - allow stop
 echo "[Stop] ✓ Git status clean, safe to end session" >&2
-echo '{"decision": "allow"}'
+echo '{}'
 exit 0
