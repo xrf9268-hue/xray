@@ -20,6 +20,27 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 readonly BACKUP_RETENTION=10 # Keep last 10 backups
 
 ##
+# Internal: Check if jq is available
+#
+# Validates that jq is installed and accessible. This is required
+# for JSON processing in backup operations.
+#
+# Returns:
+#   0 - jq is available
+#   1 - jq is not available (error logged with installation hint)
+#
+# Example:
+#   backup::_require_jq || return 1
+##
+backup::_require_jq() {
+  if ! command -v jq > /dev/null 2>&1; then
+    core::log error "jq is required but not installed" '{"hint":"Install with: apt install jq / yum install jq / brew install jq"}'
+    return 1
+  fi
+  return 0
+}
+
+##
 # Get backup directory path
 #
 # Returns the backup storage directory path, respecting XRF_VAR override.
@@ -67,6 +88,9 @@ backup::dir() {
 #   backup::create  # Auto-generated name
 ##
 backup::create() {
+  # Check jq dependency
+  backup::_require_jq || return 1
+
   local name="${1:-}"
   local timestamp
   timestamp="$(date +%Y%m%d-%H%M%S)"
@@ -202,11 +226,14 @@ backup::create() {
 #   XRF_JSON=true backup::list
 ##
 backup::list() {
+  # Check jq dependency (needed for parsing metadata)
+  backup::_require_jq || return 1
+
   local backup_dir
   backup_dir="$(backup::dir)"
 
   if [[ ! -d "${backup_dir}" ]]; then
-    core::log info "no backups found" "$(printf '{"dir":"%s"}' "${backup_dir}")"
+    core::log info "no backups found" "$(printf '{"dir":"%s"}' "$(core::json_escape "${backup_dir}")")"
     return 0
   fi
 
@@ -481,6 +508,9 @@ backup::delete() {
 #   backup::verify "backup-20231201-120000"
 ##
 backup::verify() {
+  # Check jq dependency
+  backup::_require_jq || return 1
+
   local name="${1:?backup name required}"
 
   local backup_dir

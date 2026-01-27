@@ -37,11 +37,10 @@ download::verify_commit() {
   local repo_path="${1:-}"
   local expected_hash="${2:-}"
 
-  # Validate inputs
-  if [[ -z "${repo_path}" || -z "${expected_hash}" ]]; then
-    core::log error "missing required arguments" '{"function":"verify_commit"}'
-    return 1
-  fi
+  # Validate inputs using standardized parameter validation
+  core::require_params \
+    "repo_path=${repo_path}" \
+    "expected_hash=${expected_hash}" || return 1
 
   # Check if git repo exists
   if [[ ! -d "${repo_path}/.git" ]]; then
@@ -93,11 +92,8 @@ download::verify_commit() {
 download::verify_gpg_signature() {
   local repo_path="${1:-}"
 
-  # Validate input
-  if [[ -z "${repo_path}" ]]; then
-    core::log error "missing required arguments" '{"function":"verify_gpg_signature"}'
-    return 1
-  fi
+  # Validate input using standardized parameter validation
+  core::require_param "${repo_path}" "repo_path" "verify_gpg_signature" || return 1
 
   # Check if git repo exists
   if [[ ! -d "${repo_path}/.git" ]]; then
@@ -148,11 +144,11 @@ download::via_tarball() {
   local dest_dir="${2:-}"
   local branch="${3:-}"
 
-  # Validate inputs
-  if [[ -z "${url}" || -z "${dest_dir}" || -z "${branch}" ]]; then
-    core::log error "missing required arguments" '{"function":"via_tarball"}'
-    return 1
-  fi
+  # Validate inputs using standardized parameter validation
+  core::require_params \
+    "url=${url}" \
+    "dest_dir=${dest_dir}" \
+    "branch=${branch}" || return 1
 
   local tarball="${dest_dir}/archive.tar.gz"
   local download_success=false
@@ -239,11 +235,11 @@ download::with_fallback() {
   local dest_dir="${2:-}"
   local branch="${3:-}"
 
-  # Validate inputs
-  if [[ -z "${repo_url}" || -z "${dest_dir}" || -z "${branch}" ]]; then
-    core::log error "missing required arguments" '{"function":"with_fallback"}'
-    return 1
-  fi
+  # Validate inputs using standardized parameter validation
+  core::require_params \
+    "repo_url=${repo_url}" \
+    "dest_dir=${dest_dir}" \
+    "branch=${branch}" || return 1
 
   # Method 1: Git clone (preferred)
   if command -v git > /dev/null 2>&1; then

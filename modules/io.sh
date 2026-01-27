@@ -37,11 +37,15 @@ io::ensure_dir() {
   fi
 
   if ! mkdir -p "${dir}" 2> /dev/null; then
-    core::log warn "mkdir fallback sudo" "$(printf '{"dir":"%s"}' "${dir}")"
-    sudo mkdir -p "${dir}"
+    core::log warn "mkdir fallback sudo" "$(printf '{"dir":"%s"}' "$(core::json_escape "${dir}")")"
+    if ! core::sudo_cmd mkdir -p "${dir}"; then
+      core::log error "failed to create directory" "$(printf '{"dir":"%s"}' "$(core::json_escape "${dir}")")"
+      return 1
+    fi
   fi
 
   chmod "${mode}" "${dir}" || true
+  return 0
 }
 
 ##
@@ -118,12 +122,12 @@ io::atomic_write() {
     return 0
   fi
 
-  core::log warn "write needs sudo" "$(printf '{"file":"%s"}' "${dst}")"
-  if ! sudo mv -f "${tmp}" "${dst}"; then
+  core::log warn "write needs sudo" "$(printf '{"file":"%s"}' "$(core::json_escape "${dst}")")"
+  if ! core::sudo_cmd mv -f "${tmp}" "${dst}"; then
     cleanup_tmp
     return 1
   fi
-  sudo chmod "${mode}" "${dst}" || true
+  core::sudo_cmd chmod "${mode}" "${dst}" || true
 
   # Success - temp file has been moved
   return 0
@@ -150,10 +154,14 @@ io::atomic_write() {
 ##
 io::install_file() {
   local src="${1}" dst="${2}" mode="${3:-0755}"
-  io::ensure_dir "$(dirname "${dst}")"
+  io::ensure_dir "$(dirname "${dst}")" || return 1
   if ! cp -f "${src}" "${dst}" 2> /dev/null; then
-    core::log warn "copy needs sudo" "$(printf '{"file":"%s"}' "${dst}")"
-    sudo cp -f "${src}" "${dst}"
+    core::log warn "copy needs sudo" "$(printf '{"file":"%s"}' "$(core::json_escape "${dst}")")"
+    if ! core::sudo_cmd cp -f "${src}" "${dst}"; then
+      core::log error "failed to copy file" "$(printf '{"src":"%s","dst":"%s"}' "$(core::json_escape "${src}")" "$(core::json_escape "${dst}")")"
+      return 1
+    fi
   fi
   chmod "${mode}" "${dst}" || true
+  return 0
 }
