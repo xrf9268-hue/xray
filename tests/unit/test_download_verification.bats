@@ -6,7 +6,7 @@ load ../test_helper
 setup() {
   setup_test_env
   # Source download module
-  source "${PROJECT_ROOT}/lib/download.sh" 2>/dev/null || true
+  source "${PROJECT_ROOT}/lib/download.sh" 2> /dev/null || true
 }
 
 teardown() {
@@ -23,13 +23,13 @@ teardown() {
   mkdir -p "${tmpdir}"
 
   cd "${tmpdir}"
-  git init >/dev/null 2>&1
+  git init > /dev/null 2>&1
   git config user.email "test@example.com"
   git config user.name "Test User"
   git config commit.gpgsign false  # Disable GPG signing for tests
   echo "test" > file.txt
   git add file.txt
-  git commit -m "test commit" >/dev/null 2>&1
+  git commit -m "test commit" > /dev/null 2>&1
 
   local commit
   commit="$(git rev-parse HEAD)"
@@ -46,13 +46,13 @@ teardown() {
   mkdir -p "${tmpdir}"
 
   cd "${tmpdir}"
-  git init >/dev/null 2>&1
+  git init > /dev/null 2>&1
   git config user.email "test@example.com"
   git config user.name "Test User"
   git config commit.gpgsign false  # Disable GPG signing for tests
   echo "test" > file.txt
   git add file.txt
-  git commit -m "test commit" >/dev/null 2>&1
+  git commit -m "test commit" > /dev/null 2>&1
 
   # Test with wrong hash
   run download::verify_commit "${tmpdir}" "0000000000000000000000000000000000000000"
@@ -73,12 +73,12 @@ teardown() {
   # Missing both arguments
   run download::verify_commit
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "missing required arguments" ]]
+  [[ "$output" =~ "missing required parameter" ]]
 
   # Missing second argument
   run download::verify_commit "/tmp/repo"
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "missing required arguments" ]]
+  [[ "$output" =~ "missing required parameter" ]]
 }
 
 @test "download::verify_commit - handles non-existent directory" {
@@ -126,13 +126,13 @@ teardown() {
   mkdir -p "${tmpdir}"
 
   cd "${tmpdir}"
-  git init >/dev/null 2>&1
+  git init > /dev/null 2>&1
   git config user.email "test@example.com"
   git config user.name "Test User"
   git config commit.gpgsign false  # Disable GPG signing for tests
   echo "test" > file.txt
   git add file.txt
-  git commit -m "unsigned commit" >/dev/null 2>&1
+  git commit -m "unsigned commit" > /dev/null 2>&1
 
   # Should not fail on unsigned commits (optional verification)
   run download::verify_gpg_signature "${tmpdir}"
@@ -142,7 +142,7 @@ teardown() {
 @test "download::verify_gpg_signature - validates required arguments" {
   run download::verify_gpg_signature
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "missing required arguments" ]] || [[ "$output" =~ "not a git repository" ]]
+  [[ "$output" =~ "missing required parameter" ]] || [[ "$output" =~ "not a git repository" ]]
 }
 
 # ============================================================================
@@ -155,7 +155,7 @@ teardown() {
   mkdir -p "${tmpdir}"
 
   cd "${tmpdir}"
-  git init >/dev/null 2>&1
+  git init > /dev/null 2>&1
   git config user.email "test@example.com"
   git config user.name "Test User"
   git config commit.gpgsign false  # Disable GPG signing for tests
@@ -166,7 +166,7 @@ teardown() {
   chmod +x bin/xrf
 
   git add .
-  git commit -m "initial commit" >/dev/null 2>&1
+  git commit -m "initial commit" > /dev/null 2>&1
 
   local commit
   commit="$(git rev-parse HEAD)"
@@ -190,13 +190,13 @@ teardown() {
   mkdir -p "${tmpdir}"
 
   cd "${tmpdir}"
-  git init >/dev/null 2>&1
+  git init > /dev/null 2>&1
   git config user.email "test@example.com"
   git config user.name "Test User"
   git config commit.gpgsign false  # Disable GPG signing for tests
   echo "original" > file.txt
   git add file.txt
-  git commit -m "original commit" >/dev/null 2>&1
+  git commit -m "original commit" > /dev/null 2>&1
 
   local original_commit
   original_commit="$(git rev-parse HEAD)"
@@ -204,7 +204,7 @@ teardown() {
   # Make another commit (simulate tampering)
   echo "tampered" > file.txt
   git add file.txt
-  git commit -m "tampered commit" >/dev/null 2>&1
+  git commit -m "tampered commit" > /dev/null 2>&1
 
   # Verification should fail with original commit hash
   run download::verify_commit "${tmpdir}" "${original_commit}"

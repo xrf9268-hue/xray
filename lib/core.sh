@@ -46,6 +46,77 @@ core::init() {
 }
 
 ##
+# Check if bash strict mode is enabled
+#
+# Verifies that set -e, set -u, and set -o pipefail are enabled.
+# Useful for defensive programming when libraries are sourced
+# without proper initialization.
+#
+# Arguments:
+#   None
+#
+# Returns:
+#   0 - Strict mode is fully enabled
+#   1 - One or more strict mode options are disabled
+#
+# Example:
+#   if ! core::is_strict_mode; then
+#     echo "Warning: strict mode not enabled" >&2
+#   fi
+##
+core::is_strict_mode() {
+  # Check if errexit (set -e) is enabled
+  [[ $- == *e* ]] || return 1
+  # Check if nounset (set -u) is enabled
+  [[ $- == *u* ]] || return 1
+  # Check if pipefail is enabled
+  [[ "$(set -o | grep pipefail)" == *"on"* ]] || return 1
+  return 0
+}
+
+##
+# Ensure strict mode is enabled, with optional warning
+#
+# Checks if strict mode is enabled and optionally logs a warning
+# if not. Controlled by XRF_STRICT_CHECK environment variable.
+# Does not modify shell options - just validates and warns.
+#
+# Arguments:
+#   $1 - Context/module name for warning message (string, optional)
+#
+# Globals:
+#   XRF_STRICT_CHECK - If "true", log warning when strict mode disabled
+#
+# Returns:
+#   0 - Strict mode is enabled
+#   1 - Strict mode is disabled (warning logged if XRF_STRICT_CHECK=true)
+#
+# Example:
+#   core::ensure_strict_mode "backup" || return 1
+##
+core::ensure_strict_mode() {
+  local context="${1:-}"
+
+  if core::is_strict_mode; then
+    return 0
+  fi
+
+  # Only warn if XRF_STRICT_CHECK is enabled (opt-in for backwards compatibility)
+  if [[ "${XRF_STRICT_CHECK:-false}" == "true" ]]; then
+    local ctx_json="{}"
+    if [[ -n "${context}" ]]; then
+      ctx_json="$(printf '{"module":"%s","hint":"call core::init() at script start"}' "$(core::json_escape "${context}")")"
+    else
+      ctx_json='{"hint":"call core::init() at script start"}'
+    fi
+    # Use echo to stderr since core::log may depend on strict mode being set
+    echo "[$(date -u +'%Y-%m-%dT%H:%M:%SZ')] warn     strict mode not enabled ${ctx_json}" >&2
+  fi
+
+  return 1
+}
+
+##
 # ERR trap handler for error logging
 #
 # Internal function called by ERR trap to log error details before exit.
@@ -65,8 +136,63 @@ core::init() {
 core::error_handler() {
   local return_code="${1}" line_number="${2}" command="${3}"
   # Use critical level for ERR trap (doesn't exit, trap will handle that)
-  core::log critical "ERR trap" "$(printf '{"rc":%d,"line":%d,"cmd":"%s"}' "${return_code}" "${line_number}" "${command//\"/\\\"}")"
+  # Use core::json_escape for complete JSON escaping (CWE-345)
+  core::log critical "ERR trap" "$(printf '{"rc":%d,"line":%d,"cmd":"%s"}' "${return_code}" "${line_number}" "$(core::json_escape "${command}")")"
   exit "${return_code}"
+}
+
+##
+# Escape a string for safe JSON embedding
+#
+# Escapes all JSON special characters according to RFC 8259:
+# - Backslash (\) -> \\
+# - Double quote (") -> \"
+# - Newline -> \n
+# - Carriage return -> \r
+# - Tab -> \t
+# - Control characters (0x00-0x1F) -> \uXXXX
+#
+# Arguments:
+#   $1 - String to escape (string, required)
+#
+# Output:
+#   Escaped string to stdout (safe for JSON embedding)
+#
+# Returns:
+#   0 - Always succeeds
+#
+# Example:
+#   escaped="$(core::json_escape "line1\nline2")"
+#   printf '{"msg":"%s"}' "$(core::json_escape "${user_input}")"
+##
+core::json_escape() {
+  local input="${1:-}"
+  local output=""
+  local i char code
+
+  for ((i = 0; i < ${#input}; i++)); do
+    char="${input:i:1}"
+    case "${char}" in
+      $'\\') output+='\\' ;;
+      '"') output+='\"' ;;
+      $'\n') output+='\n' ;;
+      $'\r') output+='\r' ;;
+      $'\t') output+='\t' ;;
+      *)
+        # Check for control characters (0x00-0x1F)
+        # Use printf to get ASCII value
+        code=$(printf '%d' "'${char}" 2> /dev/null || echo 0)
+        if [[ ${code} -ge 0 && ${code} -le 31 ]]; then
+          # Format as \uXXXX
+          output+=$(printf '\\u%04x' "${code}")
+        else
+          output+="${char}"
+        fi
+        ;;
+    esac
+  done
+
+  printf '%s' "${output}"
 }
 
 ##
@@ -214,6 +340,136 @@ core::retry() {
 }
 
 ##
+# Validate that a required parameter is provided and non-empty
+#
+# Checks if a parameter value is non-empty and logs an error with
+# context if validation fails. Reduces boilerplate validation code.
+#
+# Arguments:
+#   $1 - Parameter value to check (string, required)
+#   $2 - Parameter name for error message (string, required)
+#   $3 - Function/context name for error message (string, optional)
+#
+# Returns:
+#   0 - Parameter is valid (non-empty)
+#   1 - Parameter is empty or missing
+#
+# Example:
+#   core::require_param "${domain}" "domain" "install" || return 1
+#   core::require_param "${port}" "port" || return 1
+##
+core::require_param() {
+  local value="${1:-}"
+  local param_name="${2:-param}"
+  local context="${3:-}"
+
+  if [[ -z "${value}" ]]; then
+    local ctx_json="{}"
+    if [[ -n "${context}" ]]; then
+      ctx_json="$(printf '{"param":"%s","function":"%s"}' "$(core::json_escape "${param_name}")" "$(core::json_escape "${context}")")"
+    else
+      ctx_json="$(printf '{"param":"%s"}' "$(core::json_escape "${param_name}")")"
+    fi
+    core::log error "missing required parameter" "${ctx_json}"
+    return 1
+  fi
+  return 0
+}
+
+##
+# Validate multiple required parameters at once
+#
+# Checks that all parameter name=value pairs have non-empty values.
+# Useful for validating function arguments in bulk.
+#
+# Arguments:
+#   $@ - Parameter pairs in format "name=value" (at least one required)
+#
+# Returns:
+#   0 - All parameters are valid
+#   1 - One or more parameters are empty
+#
+# Example:
+#   core::require_params "domain=${domain}" "port=${port}" || return 1
+##
+core::require_params() {
+  local pair name value
+  for pair in "$@"; do
+    name="${pair%%=*}"
+    value="${pair#*=}"
+    if [[ -z "${value}" ]]; then
+      core::log error "missing required parameter" "$(printf '{"param":"%s"}' "$(core::json_escape "${name}")")"
+      return 1
+    fi
+  done
+  return 0
+}
+
+##
+# Execute a command with sudo, with proper error handling
+#
+# Wraps sudo execution with availability check and error logging.
+# Returns appropriate error codes for different failure scenarios.
+#
+# Arguments:
+#   $@ - Command and arguments to execute with sudo (required)
+#
+# Returns:
+#   0 - Command succeeded
+#   1 - Command failed (with error logged)
+#   2 - sudo not available (with error logged)
+#   3 - No command provided
+#
+# Example:
+#   core::sudo_cmd mkdir -p /etc/myapp
+#   core::sudo_cmd chown root:root /etc/myapp/config
+#   if ! core::sudo_cmd systemctl restart myapp; then
+#     echo "Failed to restart service"
+#   fi
+##
+core::sudo_cmd() {
+  # Check for command argument
+  if [[ $# -eq 0 ]]; then
+    core::log error "sudo_cmd called without command" "{}"
+    return 3
+  fi
+
+  # Check if sudo is available
+  if ! command -v sudo > /dev/null 2>&1; then
+    core::log error "sudo not available" "$(printf '{"cmd":"%s"}' "$(core::json_escape "$*")")"
+    return 2
+  fi
+
+  # Execute command with sudo
+  local cmd_str="$*"
+  if ! sudo "$@"; then
+    local rc=$?
+    core::log error "sudo command failed" "$(printf '{"cmd":"%s","rc":%d}' "$(core::json_escape "${cmd_str}")" "${rc}")"
+    return 1
+  fi
+
+  return 0
+}
+
+##
+# Check if sudo is available
+#
+# Simple check for sudo availability without executing anything.
+#
+# Returns:
+#   0 - sudo is available
+#   1 - sudo is not available
+#
+# Example:
+#   if core::has_sudo; then
+#     core::sudo_cmd mkdir -p /etc/app
+#   fi
+##
+core::has_sudo() {
+  command -v sudo > /dev/null 2>&1
+}
+
+##
 # Ensure lock file is writable by current user
 #
 # Handles mixed sudo/non-sudo scenarios where lock file may be
@@ -241,21 +497,18 @@ core::ensure_lock_writable() {
   # If file doesn't exist, nothing to fix
   [[ ! -f "${lock}" ]] && return 0
 
-  local has_sudo=false
-  command -v sudo > /dev/null 2>&1 && has_sudo=true
-
   # Fix ownership (may be root-owned from previous sudo run)
   if ! chown "$(id -u):$(id -g)" "${lock}" 2> /dev/null; then
-    if ! ${has_sudo} || ! sudo chown "$(id -u):$(id -g)" "${lock}" 2> /dev/null; then
-      core::log warn "cannot fix lock file ownership" "$(printf '{"lock":"%s"}' "${lock//\"/\\\"}")"
+    if ! core::has_sudo || ! sudo chown "$(id -u):$(id -g)" "${lock}" 2> /dev/null; then
+      core::log warn "cannot fix lock file ownership" "$(printf '{"lock":"%s"}' "$(core::json_escape "${lock}")")"
       return 1
     fi
   fi
 
   # Fix permissions (make writable)
   if ! chmod 0644 "${lock}" 2> /dev/null; then
-    if ! ${has_sudo} || ! sudo chmod 0644 "${lock}" 2> /dev/null; then
-      core::log warn "cannot fix lock file permissions" "$(printf '{"lock":"%s"}' "${lock//\"/\\\"}")"
+    if ! core::has_sudo || ! sudo chmod 0644 "${lock}" 2> /dev/null; then
+      core::log warn "cannot fix lock file permissions" "$(printf '{"lock":"%s"}' "$(core::json_escape "${lock}")")"
       return 1
     fi
   fi
@@ -293,29 +546,32 @@ core::with_flock() {
   local lock="${1}"
   shift || true
   [[ $# -gt 0 ]] || {
-    core::log error "with_flock missing command" "$(printf '{"lock":"%s"}' "${lock//\"/\\\"}")"
+    core::log error "with_flock missing command" "$(printf '{"lock":"%s"}' "$(core::json_escape "${lock}")")"
     return 2
   }
   local dir
   dir="$(dirname "${lock}")"
   if ! mkdir -p "${dir}" 2> /dev/null; then
-    core::log warn "mkdir fallback sudo" "$(printf '{"dir":"%s"}' "${dir//\"/\\\"}")"
-    sudo mkdir -p "${dir}"
+    core::log warn "mkdir fallback sudo" "$(printf '{"dir":"%s"}' "$(core::json_escape "${dir}")")"
+    if ! core::sudo_cmd mkdir -p "${dir}"; then
+      core::log error "failed to create lock directory" "$(printf '{"dir":"%s"}' "$(core::json_escape "${dir}")")"
+      return 1
+    fi
   fi
 
   # Security: Atomic lock file creation with correct ownership and permissions
   # Use install(1) instead of touch + chown to prevent TOCTOU window
   if ! test -f "${lock}" 2> /dev/null; then
     if ! install -m 0644 -o "$(id -u)" -g "$(id -g)" /dev/null "${lock}" 2> /dev/null; then
-      core::log warn "lock file creation needs sudo" "$(printf '{"file":"%s"}' "${lock//\"/\\\"}")"
+      core::log warn "lock file creation needs sudo" "$(printf '{"file":"%s"}' "$(core::json_escape "${lock}")")"
       # Use install with sudo for atomic creation (single syscall, no TOCTOU)
-      sudo install -m 0644 -o "$(id -u)" -g "$(id -g)" /dev/null "${lock}" 2> /dev/null || true
+      core::sudo_cmd install -m 0644 -o "$(id -u)" -g "$(id -g)" /dev/null "${lock}" 2> /dev/null || true
     fi
   fi
 
   # Ensure lock file is writable (handles previous root runs - CWE-283)
   core::ensure_lock_writable "${lock}" || {
-    core::log error "lock file not writable" "$(printf '{"lock":"%s"}' "${lock//\"/\\\"}")"
+    core::log error "lock file not writable" "$(printf '{"lock":"%s"}' "$(core::json_escape "${lock}")")"
     return 1
   }
 

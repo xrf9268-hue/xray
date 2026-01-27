@@ -156,7 +156,7 @@ plugins::enable() {
 
   # Check if plugin exists
   if [[ ! -f "${src}" ]]; then
-    echo "plugin not found: ${id}" >&2
+    core::log error "plugin not found" "$(printf '{"plugin":"%s"}' "$(core::json_escape "${id}")")"
     return 2
   fi
 
@@ -167,7 +167,7 @@ plugins::enable() {
   real_av_dir="$(realpath "${av_dir}" 2> /dev/null || echo "")"
 
   if [[ -z "${real_src}" || -z "${real_av_dir}" ]] || [[ ! "${real_src}" =~ ^"${real_av_dir}"/ ]]; then
-    echo "plugin source validation failed: ${id}" >&2
+    core::log error "plugin source validation failed" "$(printf '{"plugin":"%s"}' "$(core::json_escape "${id}")")"
     return 2
   fi
 
@@ -186,7 +186,7 @@ plugins::enable() {
         # Check and install dependencies
         if declare -f deps::check_and_install_plugin_deps > /dev/null 2>&1; then
           if ! deps::check_and_install_plugin_deps "${id}" "${XRF_PLUGIN_DEPS[@]}"; then
-            echo "warning: plugin dependencies not satisfied, but plugin will be enabled" >&2
+            core::log warn "plugin dependencies not satisfied, but plugin will be enabled" "$(printf '{"plugin":"%s"}' "$(core::json_escape "${id}")")"
           fi
         fi
       fi
@@ -207,7 +207,7 @@ plugins::disable() {
   local dst
   dst="$(plugins::dir_enabled)/${id}.sh"
   [[ -e "${dst}" ]] || {
-    echo "plugin not enabled: ${id}" >&2
+    core::log error "plugin not enabled" "$(printf '{"plugin":"%s"}' "$(core::json_escape "${id}")")"
     return 2
   }
   rm -f "${dst}"
@@ -222,7 +222,7 @@ plugins::info() {
   local f
   f="$(plugins::dir_available)/${id}/plugin.sh"
   [[ -f "${f}" ]] || {
-    echo "plugin not found: ${id}" >&2
+    core::log error "plugin not found" "$(printf '{"plugin":"%s"}' "$(core::json_escape "${id}")")"
     return 2
   }
 
@@ -232,7 +232,7 @@ plugins::info() {
   real_av_dir="$(realpath "$(plugins::dir_available)" 2> /dev/null || echo "")"
 
   if [[ -z "${real_f}" || -z "${real_av_dir}" ]] || [[ ! "${real_f}" =~ ^"${real_av_dir}"/ ]]; then
-    echo "plugin source validation failed: ${id}" >&2
+    core::log error "plugin source validation failed" "$(printf '{"plugin":"%s"}' "$(core::json_escape "${id}")")"
     return 2
   fi
 

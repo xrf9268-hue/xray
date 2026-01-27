@@ -6,7 +6,7 @@ load ../test_helper
 setup() {
   setup_test_env
   # Source download module
-  source "${PROJECT_ROOT}/lib/download.sh" 2>/dev/null || true
+  source "${PROJECT_ROOT}/lib/download.sh" 2> /dev/null || true
 
   # Create test fixtures
   export TEST_REPO_DIR="${TEST_TMPDIR}/test-repo"
@@ -33,7 +33,7 @@ create_fake_tarball() {
   # Create tarball
   cd "${TEST_TMPDIR}" || return 1
   tar -czf "${dest}" -C "${TEST_TMPDIR}" --transform "s|^fake-repo|xray-fusion-${branch}|" fake-repo
-  cd - >/dev/null || return 1
+  cd - > /dev/null || return 1
 }
 
 # ============================================================================
@@ -44,16 +44,16 @@ create_fake_tarball() {
   # Missing all arguments
   run download::via_tarball
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "missing required arguments" ]]
+  [[ "$output" =~ "missing required parameter" ]]
 
   # Missing some arguments
   run download::via_tarball "http://test.url"
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "missing required arguments" ]]
+  [[ "$output" =~ "missing required parameter" ]]
 
   run download::via_tarball "http://test.url" "/tmp"
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "missing required arguments" ]]
+  [[ "$output" =~ "missing required parameter" ]]
 }
 
 @test "download::via_tarball - prefers curl over wget" {
@@ -67,7 +67,7 @@ create_fake_tarball() {
   # Mock command to simulate missing tools
   command() {
     case "${2:-}" in
-      curl|wget) return 1 ;;
+      curl | wget) return 1 ;;
       *) builtin command "$@" ;;
     esac
   }
@@ -188,17 +188,17 @@ create_fake_tarball() {
 @test "download::with_fallback - validates required arguments" {
   run download::with_fallback
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "missing required arguments" ]]
+  [[ "$output" =~ "missing required parameter" ]]
 
   run download::with_fallback "http://test.url"
   [ "$status" -eq 1 ]
-  [[ "$output" =~ "missing required arguments" ]]
+  [[ "$output" =~ "missing required parameter" ]]
 }
 
 @test "download::with_fallback - succeeds with git clone" {
   # Create a real git repo
   cd "${TEST_REPO_DIR}" || return 1
-  command git init >/dev/null 2>&1
+  command git init > /dev/null 2>&1
   command git config user.email "test@example.com"
   command git config user.name "Test"
   command git config commit.gpgsign false
@@ -206,8 +206,8 @@ create_fake_tarball() {
   echo "#!/bin/bash" > bin/xrf
   chmod +x bin/xrf
   command git add .
-  command git commit -m "initial" >/dev/null 2>&1
-  cd - >/dev/null || return 1
+  command git commit -m "initial" > /dev/null 2>&1
+  cd - > /dev/null || return 1
 
   # Test with real git clone
   run download::with_fallback "file://${TEST_REPO_DIR}" "${TEST_DOWNLOAD_DIR}" "master"

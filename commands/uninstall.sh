@@ -8,7 +8,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 _rm() {
   local p="${1}"
   [[ -e "${p}" || -L "${p}" ]] && {
-    echo "rm -rf ${p}"
+    core::log debug "removing" "$(printf '{"path":"%s"}' "$(core::json_escape "${p}")")"
     rm -rf "${p}" || true
   }
 }
@@ -104,6 +104,6 @@ main() {
   # Disable all enabled plugins after uninstallation
   disable_all_plugins
 
-  echo "Uninstalled."
+  core::log info "uninstallation complete" "{}"
 }
 main "${@}"
