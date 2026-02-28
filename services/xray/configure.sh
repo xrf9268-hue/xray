@@ -212,7 +212,7 @@ xray::render_reality_inbound() {
   [[ -n "${XRAY_PRIVATE_KEY}" ]] || core::log fatal "XRAY_PRIVATE_KEY required" "{}"
 
   # Prepare configuration values
-  local first_sni reality_dest server_names shortids_pool sanitized_uuid sanitized_key
+  local first_sni="" reality_dest server_names shortids_pool sanitized_uuid sanitized_key
   server_names="$(json_array_from_csv "${XRAY_SNI}" "XRAY_SNI" first_sni)"
   reality_dest="$(ensure_reality_dest "${XRAY_REALITY_DEST:-}" "${first_sni}")"
   shortids_pool="$(build_shortids_pool "${XRAY_SHORT_ID}" "${XRAY_SHORT_ID_2:-}" "${XRAY_SHORT_ID_3:-}")"
@@ -299,7 +299,7 @@ xray::render_vision_reality_inbounds() {
   validators::shortid "${XRAY_SHORT_ID_3:-}" || core::log fatal "invalid XRAY_SHORT_ID_3" "{}"
   validators::vless_crypto_value "${vless_decryption}" || core::log fatal "invalid XRAY_VLESS_DECRYPTION" "$(printf '{"value":"%s"}' "${vless_decryption}")"
 
-  local first_sni reality_dest server_names shortids_pool sanitized_vision_uuid sanitized_reality_uuid sanitized_key
+  local first_sni="" reality_dest server_names shortids_pool sanitized_vision_uuid sanitized_reality_uuid sanitized_key
   server_names="$(json_array_from_csv "${XRAY_SNI}" "XRAY_SNI" first_sni)"
   reality_dest="$(ensure_reality_dest "${XRAY_REALITY_DEST:-}" "${first_sni}")"
   shortids_pool="$(build_shortids_pool "${XRAY_SHORT_ID}" "${XRAY_SHORT_ID_2:-}" "${XRAY_SHORT_ID_3:-}")"
