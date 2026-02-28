@@ -30,10 +30,16 @@ create_fake_tarball() {
   chmod +x "${fake_repo}/bin/xrf"
   echo "test content" > "${fake_repo}/README.md"
 
-  # Create tarball
+  # Create tarball with branch-specific top-level directory.
+  # Avoid GNU tar-only --transform for BSD/macOS portability.
+  local staged_dir="${TEST_TMPDIR}/xray-fusion-${branch}"
+  rm -rf "${staged_dir}"
+  cp -R "${fake_repo}" "${staged_dir}"
+
   cd "${TEST_TMPDIR}" || return 1
-  tar -czf "${dest}" -C "${TEST_TMPDIR}" --transform "s|^fake-repo|xray-fusion-${branch}|" fake-repo
+  tar -czf "${dest}" "xray-fusion-${branch}"
   cd - > /dev/null || return 1
+  rm -rf "${staged_dir}"
 }
 
 # ============================================================================
@@ -164,13 +170,16 @@ create_fake_tarball() {
   curl() {
     return 1
   }
-  export -f curl
+  wget() {
+    return 1
+  }
+  export -f curl wget
 
   run download::via_tarball "http://test.url/archive.tar.gz" "${TEST_DOWNLOAD_DIR}" "main"
   [ "$status" -eq 1 ]
   [[ "$output" =~ "curl download failed" ]] || [[ "$output" =~ "no download tool" ]]
 
-  unset -f curl
+  unset -f curl wget
 }
 
 @test "download::via_tarball - falls back to wget when curl unavailable" {
@@ -207,6 +216,8 @@ create_fake_tarball() {
   chmod +x bin/xrf
   command git add .
   command git commit -m "initial" > /dev/null 2>&1
+  # Ensure test branch name is deterministic across git versions/configs.
+  command git branch -M master
   cd - > /dev/null || return 1
 
   # Test with real git clone

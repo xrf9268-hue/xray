@@ -6,6 +6,15 @@
 PROJECT_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 export PROJECT_ROOT
 
+# Normalize locale for cross-platform test output stability.
+if command -v locale > /dev/null 2>&1 && locale -a 2> /dev/null | grep -q '^C\.UTF-8$'; then
+  export LANG="C.UTF-8"
+  export LC_ALL="C.UTF-8"
+else
+  export LANG="C"
+  export LC_ALL="C"
+fi
+
 # Source core modules for testing
 source "${PROJECT_ROOT}/lib/core.sh"
 source "${PROJECT_ROOT}/lib/args.sh"

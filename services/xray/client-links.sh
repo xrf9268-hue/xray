@@ -31,7 +31,8 @@ main() {
         .xray.domain // "",
         .xray.uuid // "",
         .xray.port // "443",
-        .xray.fingerprint // "chrome"
+        .xray.fingerprint // "chrome",
+        .xray.vless_encryption // "none"
       ] | .[] // ""
     '
   )
@@ -47,6 +48,7 @@ main() {
   local uuid="${fields[9]:-}"
   local port="${fields[10]:-}"
   local fp="${fields[11]:-chrome}"
+  local vless_encryption="${fields[12]:-none}"
   # Ensure shortId is correct: if empty, try to read from config file
   if [[ -z "${sid}" && -f "$(xray::active)/05_inbounds.json" ]]; then
     sid="$(jq -r '.inbounds[]?.streamSettings?.realitySettings?.shortIds?[1] // .inbounds[]?.streamSettings?.realitySettings?.shortIds?[0] // empty' "$(xray::active)/05_inbounds.json" 2> /dev/null | head -1)"
@@ -65,7 +67,7 @@ main() {
         links+=("${vlink}")
       fi
       if [[ -n "${ur}" && -n "${pbk}" && -n "${sid}" ]]; then
-        local rlink="vless://${ur}@${ip}:${rport}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
+        local rlink="vless://${ur}@${ip}:${rport}?encryption=${vless_encryption}&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
         echo "REALITY: ${rlink}"
         links+=("${rlink}")
       fi
@@ -73,11 +75,11 @@ main() {
     *)
       # All fields already extracted in single jq call above (reality-only topology)
       if [[ -n "${uuid}" && -n "${pbk}" && -n "${sid}" ]]; then
-        local link="vless://${uuid}@${ip}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
+        local link="vless://${uuid}@${ip}:${port}?encryption=${vless_encryption}&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=${pbk}&sid=${sid}&spx=%2F#REALITY-${ip}"
         echo "REALITY: ${link}"
         links+=("${link}")
       else
-        echo "REALITY: vless://<UUID>@${ip}:${port}?encryption=none&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=<PUBLIC_KEY>&sid=<SHORT_ID>&spx=%2F#REALITY-${ip}"
+        echo "REALITY: vless://<UUID>@${ip}:${port}?encryption=${vless_encryption}&flow=xtls-rprx-vision&security=reality&sni=${sni%%,*}&fp=${fp}&pbk=<PUBLIC_KEY>&sid=<SHORT_ID>&spx=%2F#REALITY-${ip}"
       fi
       ;;
   esac

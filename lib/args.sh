@@ -28,6 +28,9 @@ args::init() {
   XRF_DRY_RUN="false"
   TEMPLATE=""
   FINGERPRINT="${DEFAULT_XRAY_FINGERPRINT}"
+  VLESS_ENCRYPTION_ENABLED="${DEFAULT_XRAY_VLESS_ENCRYPTION_ENABLED}"
+  VLESS_DECRYPTION=""
+  VLESS_ENCRYPTION=""
 
   # Tracking flags for explicit CLI arguments (used by template override logic)
   _TOPOLOGY_EXPLICIT=""
@@ -78,6 +81,22 @@ args::parse() {
         TEMPLATE="${2:-}"
         shift 2
         ;;
+      --enable-vless-encryption)
+        VLESS_ENCRYPTION_ENABLED="true"
+        shift
+        ;;
+      --vless-decryption)
+        args::validate_vless_crypto "${2:-}" || return 1
+        VLESS_DECRYPTION="${2:-}"
+        VLESS_ENCRYPTION_ENABLED="true"
+        shift 2
+        ;;
+      --vless-encryption)
+        args::validate_vless_crypto "${2:-}" || return 1
+        VLESS_ENCRYPTION="${2:-}"
+        VLESS_ENCRYPTION_ENABLED="true"
+        shift 2
+        ;;
       --debug)
         DEBUG="true"
         shift
@@ -115,6 +134,7 @@ args::parse() {
 
   # Export variables for use by other modules
   export TOPOLOGY DOMAIN VERSION PLUGINS DEBUG UUID UUID_FROM_STRING XRF_YES XRF_DRY_RUN TEMPLATE FINGERPRINT
+  export VLESS_ENCRYPTION_ENABLED VLESS_DECRYPTION VLESS_ENCRYPTION
   export _TOPOLOGY_EXPLICIT _VERSION_EXPLICIT _PLUGINS_EXPLICIT
 
   return 0
@@ -191,6 +211,22 @@ args::validate_fingerprint() {
   return 0
 }
 
+# VLESS crypto value validation
+args::validate_vless_crypto() {
+  local value="${1:-}"
+  if [[ -z "${value}" ]]; then
+    core::log error "vless crypto value cannot be empty" "{}"
+    return 1
+  fi
+
+  if ! validators::vless_crypto_value "${value}"; then
+    core::log error "invalid vless crypto value" "$(printf '{"value":"%s"}' "${value}")"
+    return 1
+  fi
+
+  return 0
+}
+
 # Configuration validation
 args::validate_config() {
   # vision-reality topology requires domain
@@ -213,6 +249,9 @@ Options:
   --version, -v <version>       Xray version to install (default: latest)
   --template <id>               Use pre-built template (home|office|server)
   --plugins, -p <list>          Comma-separated list of plugins to enable
+  --enable-vless-encryption     Enable optional VLESS post-quantum encryption
+  --vless-decryption <value>    Custom VLESS inbound decryption value
+  --vless-encryption <value>    Custom VLESS outbound encryption value (for links)
   --uuid <uuid>                 Custom UUID (default: auto-generated)
   --uuid-from-string <string>   Generate UUID from custom string
   --yes, -y                     Auto-confirm installation (skip prompt)
@@ -251,8 +290,8 @@ EOF
 # Show current configuration (debug helper)
 args::show_config() {
   if [[ "${DEBUG}" == "true" ]]; then
-    core::log debug "parsed arguments" "$(printf '{"topology":"%s","domain":"%s","version":"%s","plugins":"%s","fingerprint":"%s","debug":"%s"}' \
-      "${TOPOLOGY}" "${DOMAIN}" "${VERSION}" "${PLUGINS}" "${FINGERPRINT}" "${DEBUG}")"
+    core::log debug "parsed arguments" "$(printf '{"topology":"%s","domain":"%s","version":"%s","plugins":"%s","fingerprint":"%s","debug":"%s","vless_encryption_enabled":"%s"}' \
+      "${TOPOLOGY}" "${DOMAIN}" "${VERSION}" "${PLUGINS}" "${FINGERPRINT}" "${DEBUG}" "${VLESS_ENCRYPTION_ENABLED}")"
   fi
 }
 
@@ -266,6 +305,14 @@ args::export_vars() {
   # Set XRAY_FINGERPRINT for client link generation
   if [[ -n "${FINGERPRINT}" ]]; then
     export XRAY_FINGERPRINT="${FINGERPRINT}"
+  fi
+
+  export XRAY_VLESS_ENCRYPTION_ENABLED="${VLESS_ENCRYPTION_ENABLED}"
+  if [[ -n "${VLESS_DECRYPTION}" ]]; then
+    export XRAY_VLESS_DECRYPTION="${VLESS_DECRYPTION}"
+  fi
+  if [[ -n "${VLESS_ENCRYPTION}" ]]; then
+    export XRAY_VLESS_ENCRYPTION="${VLESS_ENCRYPTION}"
   fi
 
   # Set XRF_DEBUG for core module

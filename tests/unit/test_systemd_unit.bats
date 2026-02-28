@@ -659,7 +659,7 @@ EOF
 
   [ "$status" -eq 0 ]
   local perms
-  perms=$(stat -c "%a" "${TEST_TMPDIR}/etc/systemd/system/xray.service")
+  perms=$(stat -c "%a" "${TEST_TMPDIR}/etc/systemd/system/xray.service" 2>/dev/null || stat -f "%Lp" "${TEST_TMPDIR}/etc/systemd/system/xray.service")
   [[ "${perms}" == "644" ]]
 }
 

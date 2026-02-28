@@ -199,6 +199,7 @@ xray::write_base_configs() {
 xray::render_reality_inbound() {
   local release_dir="${1}"
   local sniff_bool="${2}"
+  local vless_decryption="${XRAY_VLESS_DECRYPTION:-none}"
 
   # Validate required variables
   : "${XRAY_PORT:=443}" : "${XRAY_UUID:?}" : "${XRAY_SNI:=www.microsoft.com}"
@@ -207,6 +208,7 @@ xray::render_reality_inbound() {
   validators::port "${XRAY_PORT}" || core::log fatal "invalid XRAY_PORT" "$(printf '{"port":"%s"}' "${XRAY_PORT}")"
   validators::uuid "${XRAY_UUID}" || core::log fatal "invalid XRAY_UUID format" "$(printf '{"uuid":"%s"}' "${XRAY_UUID}")"
   validators::shortid "${XRAY_SHORT_ID}" || core::log fatal "invalid XRAY_SHORT_ID" "{}"
+  validators::vless_crypto_value "${vless_decryption}" || core::log fatal "invalid XRAY_VLESS_DECRYPTION" "$(printf '{"value":"%s"}' "${vless_decryption}")"
   [[ -n "${XRAY_PRIVATE_KEY}" ]] || core::log fatal "XRAY_PRIVATE_KEY required" "{}"
 
   # Prepare configuration values
@@ -228,6 +230,7 @@ xray::render_reality_inbound() {
     --arg dest "${reality_dest}" \
     --argjson serverNames "${server_names}" \
     --arg privateKey "${sanitized_key}" \
+    --arg decryption "${vless_decryption}" \
     --argjson shortIds "${shortids_pool}" \
     --argjson sniff "${sniff_bool}" \
     '{
@@ -237,7 +240,7 @@ xray::render_reality_inbound() {
           listen: "0.0.0.0",
           port: $port,
           protocol: "vless",
-          settings: {clients: [{id: $uuid, flow: "xtls-rprx-vision"}], decryption: "none"},
+          settings: {clients: [{id: $uuid, flow: "xtls-rprx-vision"}], decryption: $decryption},
           streamSettings: {
             network: "tcp",
             security: "reality",
@@ -263,6 +266,7 @@ xray::render_reality_inbound() {
 xray::render_vision_reality_inbounds() {
   local release_dir="${1}"
   local sniff_bool="${2}"
+  local vless_decryption="${XRAY_VLESS_DECRYPTION:-none}"
 
   # Validate required variables
   : "${XRAY_VISION_PORT:=8443}" : "${XRAY_REALITY_PORT:=443}"
@@ -293,6 +297,7 @@ xray::render_vision_reality_inbounds() {
   validators::shortid "${XRAY_SHORT_ID}" || core::log fatal "invalid XRAY_SHORT_ID" "{}"
   validators::shortid "${XRAY_SHORT_ID_2:-}" || core::log fatal "invalid XRAY_SHORT_ID_2" "{}"
   validators::shortid "${XRAY_SHORT_ID_3:-}" || core::log fatal "invalid XRAY_SHORT_ID_3" "{}"
+  validators::vless_crypto_value "${vless_decryption}" || core::log fatal "invalid XRAY_VLESS_DECRYPTION" "$(printf '{"value":"%s"}' "${vless_decryption}")"
 
   local first_sni reality_dest server_names shortids_pool sanitized_vision_uuid sanitized_reality_uuid sanitized_key
   server_names="$(json_array_from_csv "${XRAY_SNI}" "XRAY_SNI" first_sni)"
@@ -317,6 +322,7 @@ xray::render_vision_reality_inbounds() {
     --arg reality_uuid "${sanitized_reality_uuid}" \
     --argjson serverNames "${server_names}" \
     --arg privateKey "${sanitized_key}" \
+    --arg decryption "${vless_decryption}" \
     --argjson shortIds "${shortids_pool}" \
     --arg dest "${reality_dest}" \
     --arg cert_dir "${XRAY_CERT_DIR}" \
@@ -355,7 +361,7 @@ xray::render_vision_reality_inbounds() {
           listen: "0.0.0.0",
           port: $reality_port,
           protocol: "vless",
-          settings: {clients: [{id: $reality_uuid, flow: "xtls-rprx-vision"}], decryption: "none"},
+          settings: {clients: [{id: $reality_uuid, flow: "xtls-rprx-vision"}], decryption: $decryption},
           streamSettings: {
             network: "tcp",
             security: "reality",
@@ -475,6 +481,12 @@ deploy_release() {
       printf '%s\n' "${test_output}" >&2
       return 1
     fi
+
+    local compat_warning
+    while IFS= read -r compat_warning; do
+      [[ -n "${compat_warning}" ]] || continue
+      core::log warn "${compat_warning}" "$(printf '{"confdir":"%s"}' "${release_dir//\"/\\\"}")"
+    done < <(xray::extract_compat_warnings "${test_output}")
     core::log debug "xray config test passed" "$(printf '{"confdir":"%s"}' "${release_dir}")"
   fi
   local new_digest

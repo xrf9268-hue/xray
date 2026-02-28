@@ -42,7 +42,7 @@ teardown() {
 
   # Check permissions are now 644
   local perms
-  perms=$(stat -c "%a" "${lock_file}")
+  perms=$(stat -c "%a" "${lock_file}" 2>/dev/null || stat -f "%Lp" "${lock_file}")
   [[ "${perms}" == "644" ]]
 }
 
@@ -55,7 +55,7 @@ teardown() {
   [ "$status" -eq 0 ]
 
   local perms
-  perms=$(stat -c "%a" "${lock_file}")
+  perms=$(stat -c "%a" "${lock_file}" 2>/dev/null || stat -f "%Lp" "${lock_file}")
   [[ "${perms}" == "644" ]]
 }
 

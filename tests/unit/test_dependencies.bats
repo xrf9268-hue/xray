@@ -18,6 +18,16 @@ teardown() {
 @test "deps::check_critical - succeeds when all tools available" {
   source "${PROJECT_ROOT}/lib/dependencies.sh"
 
+  # macOS test environments may not ship systemctl; provide a lightweight stub.
+  local fake_bin="${TEST_TMPDIR}/bin"
+  mkdir -p "${fake_bin}"
+  cat > "${fake_bin}/systemctl" << 'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+  chmod +x "${fake_bin}/systemctl"
+  export PATH="${fake_bin}:${PATH}"
+
   run deps::check_critical
   [ "$status" -eq 0 ]
 }
@@ -46,12 +56,14 @@ teardown() {
   source "${PROJECT_ROOT}/lib/dependencies.sh"
 
   command() {
-    builtin command "$@" 2>/dev/null || return 1
-    case "${2}" in
-      git) return 0 ;;
-      curl|wget) return 1 ;;
-      *) return 0 ;;
-    esac
+    if [[ "${1:-}" == "-v" ]]; then
+      case "${2:-}" in
+        git|systemctl|mktemp|tar|gzip) return 0 ;;
+        curl|wget) return 1 ;;
+        *) return 0 ;;
+      esac
+    fi
+    builtin command "$@" 2>/dev/null
   }
   export -f command
 
@@ -65,12 +77,14 @@ teardown() {
   source "${PROJECT_ROOT}/lib/dependencies.sh"
 
   command() {
-    builtin command "$@" 2>/dev/null || return 1
-    case "${2}" in
-      curl) return 0 ;;
-      git|wget) return 1 ;;
-      *) return 0 ;;
-    esac
+    if [[ "${1:-}" == "-v" ]]; then
+      case "${2:-}" in
+        curl|systemctl|mktemp|tar|gzip) return 0 ;;
+        git|wget) return 1 ;;
+        *) return 0 ;;
+      esac
+    fi
+    builtin command "$@" 2>/dev/null
   }
   export -f command
 
@@ -84,12 +98,14 @@ teardown() {
   source "${PROJECT_ROOT}/lib/dependencies.sh"
 
   command() {
-    builtin command "$@" 2>/dev/null || return 1
-    case "${2}" in
-      wget) return 0 ;;
-      git|curl) return 1 ;;
-      *) return 0 ;;
-    esac
+    if [[ "${1:-}" == "-v" ]]; then
+      case "${2:-}" in
+        wget|systemctl|mktemp|tar|gzip) return 0 ;;
+        git|curl) return 1 ;;
+        *) return 0 ;;
+      esac
+    fi
+    builtin command "$@" 2>/dev/null
   }
   export -f command
 

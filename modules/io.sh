@@ -100,7 +100,13 @@ io::atomic_write() {
 
   # Security: Create temp file in destination directory (same partition for atomic mv)
   # Use hidden prefix to prevent conflicts and mktemp XXXXXX for unpredictability
-  tmp="$(mktemp -p "${dstdir}" .atomic-write.XXXXXX.tmp)" || return 1
+  local attempt=0
+  while true; do
+    tmp="$(mktemp -p "${dstdir}" .atomic-write.XXXXXX.tmp 2> /dev/null)" && break
+    attempt=$((attempt + 1))
+    [[ "${attempt}" -lt 5 ]] || return 1
+    sleep 0.02
+  done
 
   cleanup_tmp() {
     rm -f "${tmp}" 2> /dev/null || true

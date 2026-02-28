@@ -198,6 +198,55 @@ JSON
   [[ "${output}" =~ fp=chrome ]]
 }
 
+@test "client-links adds vless encryption for reality-only when configured" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey==",
+      "vless_encryption": "mlkem768x25519plus.native.0rtt.clientkey"
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
+
+  [ "$status" -eq 0 ]
+  [[ "${output}" =~ encryption=mlkem768x25519plus.native.0rtt.clientkey ]]
+}
+
+@test "client-links keeps vision link unchanged when vless encryption is configured" {
+  write_state '{
+    "name": "vision-reality",
+    "xray": {
+      "domain": "example.com",
+      "vision_port": 8443,
+      "reality_port": 443,
+      "uuid_vision": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "uuid_reality": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey==",
+      "vless_encryption": "mlkem768x25519plus.native.0rtt.clientkey"
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" vision-reality
+
+  [ "$status" -eq 0 ]
+  local vision_line
+  vision_line="$(echo "${output}" | grep '^VISION :')"
+  # Vision link must remain TLS-only and must not include encryption=
+  [[ -n "${vision_line}" ]]
+  [[ "${vision_line}" =~ "security=tls" ]]
+  [[ "${vision_line}" != *"encryption="* ]]
+  # Reality link should include the configured encryption value
+  [[ "${output}" =~ "REALITY:" ]]
+  [[ "${output}" =~ "encryption=mlkem768x25519plus.native.0rtt.clientkey" ]]
+}
+
 @test "client-links uses first SNI from comma-separated list" {
   write_state '{
     "name": "reality-only",

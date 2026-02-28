@@ -3,6 +3,7 @@
 # These tests cover boundary conditions and error handling scenarios
 
 load ../test_helper
+bats_require_minimum_version 1.5.0
 
 setup() {
   setup_test_env
@@ -135,49 +136,48 @@ teardown() {
 # =============================================================================
 
 @test "templates::export - fails for empty template ID" {
-  run bash -c 'source lib/templates.sh && templates::export ""'
-  [ "$status" -ne 0 ]
+  run -127 bash -c 'source "'"${PROJECT_ROOT}/lib/core.sh"'" && source "'"${PROJECT_ROOT}/lib/templates.sh"'" && export XRF_JSON=false XRF_DEBUG=false && templates::export ""'
 }
 
 @test "templates::export - fails for non-existent template" {
-  run bash -c 'source lib/templates.sh && templates::export "not-a-template"'
+  run bash -c 'source "'"${PROJECT_ROOT}/lib/core.sh"'" && source "'"${PROJECT_ROOT}/lib/templates.sh"'" && export XRF_JSON=false XRF_DEBUG=false && templates::export "not-a-template"'
   [ "$status" -ne 0 ]
 }
 
 @test "templates::export - sets TEMPLATE_ID variable" {
-  run bash -c 'source lib/templates.sh && templates::export "home" && echo "$TEMPLATE_ID"'
+  run bash -c 'source "'"${PROJECT_ROOT}/lib/core.sh"'" && source "'"${PROJECT_ROOT}/lib/templates.sh"'" && export XRF_JSON=false XRF_DEBUG=false && templates::export "home" && echo "$TEMPLATE_ID"'
   [ "$status" -eq 0 ]
   [[ "$output" == *"home"* ]]
 }
 
 @test "templates::export - sets TEMPLATE_TOPOLOGY variable" {
-  run bash -c 'source lib/templates.sh && templates::export "home" && echo "$TEMPLATE_TOPOLOGY"'
+  run bash -c 'source "'"${PROJECT_ROOT}/lib/core.sh"'" && source "'"${PROJECT_ROOT}/lib/templates.sh"'" && export XRF_JSON=false XRF_DEBUG=false && templates::export "home" && echo "$TEMPLATE_TOPOLOGY"'
   [ "$status" -eq 0 ]
   [[ "$output" == *"reality-only"* ]]
 }
 
 @test "templates::export - sets TEMPLATE_VERSION variable" {
-  run bash -c 'source lib/templates.sh && templates::export "home" && echo "$TEMPLATE_VERSION"'
+  run bash -c 'source "'"${PROJECT_ROOT}/lib/core.sh"'" && source "'"${PROJECT_ROOT}/lib/templates.sh"'" && export XRF_JSON=false XRF_DEBUG=false && templates::export "home" && echo "$TEMPLATE_VERSION"'
   [ "$status" -eq 0 ]
   # Should be "latest" or a version like "v1.8.x"
   [[ -n "$output" ]]
 }
 
 @test "templates::export - sets port variables for reality-only topology" {
-  run bash -c 'source lib/templates.sh && templates::export "home" && echo "PORT=${TEMPLATE_PORT:-unset}"'
+  run bash -c 'source "'"${PROJECT_ROOT}/lib/core.sh"'" && source "'"${PROJECT_ROOT}/lib/templates.sh"'" && export XRF_JSON=false XRF_DEBUG=false && templates::export "home" && echo "PORT=${TEMPLATE_PORT:-unset}"'
   [ "$status" -eq 0 ]
   [[ "$output" != *"unset"* ]]
 }
 
 @test "templates::export - sets port variables for vision-reality topology" {
-  run bash -c 'source lib/templates.sh && templates::export "office" && echo "VISION=${TEMPLATE_VISION_PORT:-unset} REALITY=${TEMPLATE_REALITY_PORT:-unset}"'
+  run bash -c 'source "'"${PROJECT_ROOT}/lib/core.sh"'" && source "'"${PROJECT_ROOT}/lib/templates.sh"'" && export XRF_JSON=false XRF_DEBUG=false && templates::export "office" && echo "VISION=${TEMPLATE_VISION_PORT:-unset} REALITY=${TEMPLATE_REALITY_PORT:-unset}"'
   [ "$status" -eq 0 ]
   [[ "$output" != *"VISION=unset"* ]]
   [[ "$output" != *"REALITY=unset"* ]]
 }
 
 @test "templates::export - handles plugins array correctly" {
-  run bash -c 'source lib/templates.sh && templates::export "server" && echo "PLUGINS=${TEMPLATE_PLUGINS}"'
+  run bash -c 'source "'"${PROJECT_ROOT}/lib/core.sh"'" && source "'"${PROJECT_ROOT}/lib/templates.sh"'" && export XRF_JSON=false XRF_DEBUG=false && templates::export "server" && echo "PLUGINS=${TEMPLATE_PLUGINS}"'
   [ "$status" -eq 0 ]
   # Plugins should be comma-separated or empty
   [[ "$output" =~ PLUGINS= ]]

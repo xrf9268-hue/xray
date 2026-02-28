@@ -267,3 +267,51 @@ SHA256 (file2.zip) = 11111111111111111111111111111111111111111111111111111111111
   run xray::verify_file_checksum "${test_file}" "${extracted_sha}"
   [ "$status" -eq 0 ]
 }
+
+# Test: latest release tag parsing helpers
+@test "xray::extract_latest_tag_from_release_json - extracts valid tag_name" {
+  local payload='{"tag_name":"v26.2.6","name":"Xray-core v26.2.6"}'
+
+  run xray::extract_latest_tag_from_release_json "${payload}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "v26.2.6" ]]
+}
+
+@test "xray::extract_latest_tag_from_release_json - normalizes missing v prefix" {
+  local payload='{"tag_name":"26.2.6"}'
+
+  run xray::extract_latest_tag_from_release_json "${payload}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "v26.2.6" ]]
+}
+
+@test "xray::extract_latest_tag_from_release_json - returns empty for invalid tag" {
+  local payload='{"tag_name":"nightly-latest"}'
+
+  run xray::extract_latest_tag_from_release_json "${payload}"
+  [ "$status" -eq 0 ]
+  [[ -z "$output" ]]
+}
+
+@test "xray::resolve_latest_tag - returns parsed tag from API payload" {
+  core::retry() {
+    printf '%s' '{"tag_name":"v26.2.6"}'
+  }
+
+  run xray::resolve_latest_tag
+  [ "$status" -eq 0 ]
+  [[ "$output" == "v26.2.6" ]]
+
+  unset -f core::retry
+}
+
+@test "xray::resolve_latest_tag - fails on malformed API payload" {
+  core::retry() {
+    printf '%s' '{"tag_name":"not-a-version"}'
+  }
+
+  run xray::resolve_latest_tag
+  [ "$status" -eq 1 ]
+
+  unset -f core::retry
+}

@@ -25,10 +25,9 @@ teardown() {
 }
 
 @test "net::detect_public_ip - handles timeout gracefully" {
-  # The function uses timeout for each method, so it should complete
-  # even if network is unavailable
-  run timeout 15 bash -c 'source "'"${PROJECT_ROOT}/modules/net/network.sh"'" && net::detect_public_ip'
-  [ "$status" -eq 0 ] || [ "$status" -eq 124 ]  # 124 is timeout's exit code
+  # Function should degrade gracefully even when timeout command is unavailable.
+  run bash -c 'source "'"${PROJECT_ROOT}/modules/net/network.sh"'" && net::detect_public_ip >/dev/null'
+  [ "$status" -eq 0 ]
 }
 
 @test "net::detect_public_ip - uses fallback methods" {

@@ -71,6 +71,10 @@ teardown() {
   [ "${DEFAULT_VERSION}" = "latest" ]
 }
 
+@test "DEFAULT_XRAY_VLESS_ENCRYPTION_ENABLED is false" {
+  [ "${DEFAULT_XRAY_VLESS_ENCRYPTION_ENABLED}" = "false" ]
+}
+
 # === Path Functions Tests ===
 
 @test "defaults::xrf_prefix returns default /usr/local" {

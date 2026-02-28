@@ -410,7 +410,7 @@ line2" "test")"
 
   result="$(xray::prepare_release_dir)"
   # Directory should have 750 permissions
-  perms="$(stat -c '%a' "${result}")"
+  perms="$(stat -c '%a' "${result}" 2>/dev/null || stat -f '%Lp' "${result}")"
   [ "${perms}" = "750" ]
 }
 

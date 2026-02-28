@@ -30,6 +30,8 @@ Xray Configuration Variables:
   XRAY_PORT=443 XRAY_UUID=<uuid> XRAY_SNI=www.microsoft.com[,alt] XRAY_REALITY_DEST=www.microsoft.com XRAY_PRIVATE_KEY=<X25519> XRAY_SHORT_ID=<hex>
   # vision-reality
   XRAY_VISION_PORT=8443 XRAY_REALITY_PORT=443 XRAY_FALLBACK_PORT=8080 XRAY_UUID_VISION=<uuid> XRAY_UUID_REALITY=<uuid> XRAY_CERT_DIR=/usr/local/etc/xray/certs XRAY_PRIVATE_KEY=<X25519> XRAY_SHORT_ID=<hex>
+  # Optional VLESS Encryption (advanced)
+  XRAY_VLESS_ENCRYPTION_ENABLED=false XRAY_VLESS_DECRYPTION=<value> XRAY_VLESS_ENCRYPTION=<value>
 EOF
 }
 
@@ -272,10 +274,39 @@ main() {
     fi
   fi
 
+  # Optional VLESS encryption (Reality inbound only)
+  export XRAY_VLESS_ENCRYPTION_ENABLED="${XRAY_VLESS_ENCRYPTION_ENABLED:-false}"
+  if [[ "${XRAY_VLESS_ENCRYPTION_ENABLED}" == "true" ]]; then
+    if [[ -z "${XRAY_VLESS_DECRYPTION:-}" || -z "${XRAY_VLESS_ENCRYPTION:-}" ]]; then
+      local -a vless_pair=()
+      if [[ ! -x "$(xray::bin)" ]]; then
+        core::log error "xray binary required to auto-generate vless encryption pair" "{}"
+        exit 1
+      fi
+      if ! mapfile -t vless_pair < <(xray::generate_vless_encryption_pair "$(xray::bin)"); then
+        core::log error "failed to generate vless encryption pair" '{"hint":"xray vlessenc"}'
+        exit 1
+      fi
+      : "${XRAY_VLESS_DECRYPTION:=${vless_pair[0]:-}}"
+      : "${XRAY_VLESS_ENCRYPTION:=${vless_pair[1]:-}}"
+    fi
+
+    if ! validators::vless_crypto_value "${XRAY_VLESS_DECRYPTION:-}"; then
+      core::log error "invalid XRAY_VLESS_DECRYPTION" "$(printf '{"value":"%s"}' "${XRAY_VLESS_DECRYPTION:-}")"
+      exit 1
+    fi
+    if ! validators::vless_crypto_value "${XRAY_VLESS_ENCRYPTION:-}"; then
+      core::log error "invalid XRAY_VLESS_ENCRYPTION" "$(printf '{"value":"%s"}' "${XRAY_VLESS_ENCRYPTION:-}")"
+      exit 1
+    fi
+  else
+    XRAY_VLESS_DECRYPTION="${XRAY_VLESS_DECRYPTION:-none}"
+  fi
+
   export XRAY_SNIFFING="${XRAY_SNIFFING:-false}"
   export XRAY_UUID XRAY_UUID_VISION XRAY_UUID_REALITY XRAY_SHORT_ID XRAY_SHORT_ID_2 XRAY_SHORT_ID_3 XRAY_SNI XRAY_REALITY_DEST \
     XRAY_PORT XRAY_VISION_PORT XRAY_REALITY_PORT XRAY_DOMAIN XRAY_CERT_DIR XRAY_FALLBACK_PORT \
-    XRAY_PRIVATE_KEY XRAY_PUBLIC_KEY
+    XRAY_PRIVATE_KEY XRAY_PUBLIC_KEY XRAY_VLESS_ENCRYPTION_ENABLED XRAY_VLESS_DECRYPTION XRAY_VLESS_ENCRYPTION
 
   plugins::emit install_post "topology=${TOPOLOGY}" "version=${VERSION}"
   "${HERE}/services/xray/configure.sh" --topology "${TOPOLOGY}"
@@ -283,8 +314,8 @@ main() {
   # Install and start systemd service
   "${HERE}/services/xray/systemd-unit.sh" install
 
-  local version="unknown"
-  [[ -x "$(xray::bin)" ]] && version="$("$(xray::bin)" -version 2> /dev/null | awk 'NR==1{print $2}')"
+  local version
+  version="$(xray::installed_version)"
   local now
   now="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
   local state
@@ -294,12 +325,22 @@ main() {
       --arg vuuid "${XRAY_UUID_VISION}" --arg ruuid "${XRAY_UUID_REALITY}" \
       --arg domain "${XRAY_DOMAIN}" --arg sni "${XRAY_SNI}" --arg sid "${XRAY_SHORT_ID:-}" --arg pbk "${XRAY_PUBLIC_KEY:-}" \
       --arg fp "${XRAY_FINGERPRINT:-chrome}" \
-      '{name:$name,version:$ver,installed_at:$ts,xray:{vision_port:($vport|tonumber),reality_port:($rport|tonumber),uuid_vision:$vuuid,uuid_reality:$ruuid,domain:$domain,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk,fingerprint:$fp}}')
+      --arg vdec "${XRAY_VLESS_DECRYPTION:-}" --arg venc "${XRAY_VLESS_ENCRYPTION:-}" \
+      '
+      {name:$name,version:$ver,installed_at:$ts,xray:{vision_port:($vport|tonumber),reality_port:($rport|tonumber),uuid_vision:$vuuid,uuid_reality:$ruuid,domain:$domain,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk,fingerprint:$fp}}
+      | if $vdec != "" and $vdec != "none" then .xray.vless_decryption = $vdec else . end
+      | if $venc != "" and $venc != "none" then .xray.vless_encryption = $venc else . end
+      ')
   else
     state=$(jq -n --arg name "reality-only" --arg ver "${version}" --arg ts "${now}" \
       --arg port "${XRAY_PORT}" --arg uuid "${XRAY_UUID}" --arg sni "${XRAY_SNI}" --arg sid "${XRAY_SHORT_ID:-}" --arg pbk "${XRAY_PUBLIC_KEY:-}" \
       --arg fp "${XRAY_FINGERPRINT:-chrome}" \
-      '{name:$name,version:$ver,installed_at:$ts,xray:{port:($port|tonumber),uuid:$uuid,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk,fingerprint:$fp}}')
+      --arg vdec "${XRAY_VLESS_DECRYPTION:-}" --arg venc "${XRAY_VLESS_ENCRYPTION:-}" \
+      '
+      {name:$name,version:$ver,installed_at:$ts,xray:{port:($port|tonumber),uuid:$uuid,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk,fingerprint:$fp}}
+      | if $vdec != "" and $vdec != "none" then .xray.vless_decryption = $vdec else . end
+      | if $venc != "" and $venc != "none" then .xray.vless_encryption = $venc else . end
+      ')
   fi
   state::save "${state}"
 

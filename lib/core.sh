@@ -575,9 +575,24 @@ core::with_flock() {
     return 1
   }
 
-  (
-    exec 200>> "${lock}"
-    flock 200
-    "${@}"
-  )
+  if command -v flock > /dev/null 2>&1; then
+    (
+      exec 200>> "${lock}"
+      flock 200
+      "${@}"
+    )
+    return $?
+  fi
+
+  # macOS and some minimal environments do not provide flock(1).
+  # Fall back to directory lock with polling to preserve mutual exclusion.
+  local lock_dir="${lock}.d"
+  while ! mkdir "${lock_dir}" 2> /dev/null; do
+    sleep 0.1
+  done
+
+  "${@}"
+  local rc=$?
+  rmdir "${lock_dir}" 2> /dev/null || true
+  return "${rc}"
 }

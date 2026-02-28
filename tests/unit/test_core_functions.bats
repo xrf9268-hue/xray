@@ -2,6 +2,7 @@
 # Unit tests for core functions (lib/core.sh)
 
 load ../test_helper
+bats_require_minimum_version 1.5.0
 
 setup() {
   setup_test_env
@@ -92,7 +93,7 @@ teardown() {
 
   [ -f "${lock_file}" ]
   local perms
-  perms=$(stat -c "%a" "${lock_file}")
+  perms=$(stat -c "%a" "${lock_file}" 2>/dev/null || stat -f "%Lp" "${lock_file}")
   [[ "${perms}" == "644" ]]
 }
 
@@ -147,7 +148,7 @@ teardown() {
 
   # Check ownership (should be current user, not root)
   local owner
-  owner=$(stat -c "%U" "${lock_file}")
+  owner=$(stat -c "%U" "${lock_file}" 2>/dev/null || stat -f "%Su" "${lock_file}")
   [[ "${owner}" == "$(whoami)" ]] || [[ "${owner}" == "$(id -un)" ]]
 }
 
@@ -475,13 +476,12 @@ teardown() {
 }
 
 @test "ERR trap includes failed command" {
-  run bash -c '
+  run -127 bash -c '
     source "'"${PROJECT_ROOT}/lib/core.sh"'"
     core::init
     export XRF_JSON=false
     /nonexistent/command 2>/dev/null
   ' 2>&1
-  [ "$status" -ne 0 ]
   [[ "${output}" == *'"cmd":'* ]]
 }
 

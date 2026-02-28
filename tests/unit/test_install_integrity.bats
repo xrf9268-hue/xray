@@ -516,3 +516,52 @@ create_temp_repo() {
   [ "$status" -eq 0 ]
   [[ "${output}" == "v2.0.0" ]]
 }
+
+# =============================================================================
+# Latest resolution and retry behavior
+# =============================================================================
+
+@test "xray::install - fails when latest tag cannot be resolved" {
+  run bash -c '
+    export XRF_JSON=false XRF_DEBUG=false
+    HERE="'"${PROJECT_ROOT}"'"
+
+    source "${HERE}/lib/core.sh"
+    source "${HERE}/modules/io.sh"
+    source "${HERE}/modules/user/user.sh"
+    source "${HERE}/services/xray/common.sh"
+    source "${HERE}/services/xray/install_utils.sh"
+
+    need() { command -v "${1}" > /dev/null 2>&1 || exit 3; }
+    eval "$(sed -n '\''/^xray::install()/,/^}$/p'\'' "${HERE}/services/xray/install.sh")"
+
+    xray::resolve_latest_tag() { return 1; }
+
+    xray::install latest
+  '
+  [ "$status" -eq 1 ]
+}
+
+@test "xray::install - uses core::retry for zip download" {
+  run bash -c '
+    export XRF_JSON=false XRF_DEBUG=false
+    HERE="'"${PROJECT_ROOT}"'"
+    XRAY_URL="https://example.com/Xray-linux-64.zip"
+
+    source "${HERE}/lib/core.sh"
+    source "${HERE}/modules/io.sh"
+    source "${HERE}/modules/user/user.sh"
+    source "${HERE}/services/xray/common.sh"
+    source "${HERE}/services/xray/install_utils.sh"
+
+    need() { command -v "${1}" > /dev/null 2>&1 || exit 3; }
+    eval "$(sed -n '\''/^xray::install()/,/^}$/p'\'' "${HERE}/services/xray/install.sh")"
+
+    xray::resolve_latest_tag() { printf "v26.2.6"; }
+    core::retry() { echo "retry:$*"; return 1; }
+
+    xray::install latest
+  '
+  [ "$status" -eq 4 ]
+  [[ "${output}" == *"retry:3 curl -fsSL https://example.com/Xray-linux-64.zip -o"* ]]
+}

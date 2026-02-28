@@ -28,7 +28,7 @@ teardown() {
   io::ensure_dir "${test_dir}"
 
   local perms
-  perms=$(stat -c "%a" "${test_dir}")
+  perms=$(stat -c "%a" "${test_dir}" 2>/dev/null || stat -f "%Lp" "${test_dir}")
   [[ "${perms}" == "755" ]]
 }
 
@@ -38,7 +38,7 @@ teardown() {
   io::ensure_dir "${test_dir}" 0750
 
   local perms
-  perms=$(stat -c "%a" "${test_dir}")
+  perms=$(stat -c "%a" "${test_dir}" 2>/dev/null || stat -f "%Lp" "${test_dir}")
   [[ "${perms}" == "750" ]]
 }
 
@@ -95,7 +95,7 @@ teardown() {
   echo "test" | io::atomic_write "${test_file}"
 
   local perms
-  perms=$(stat -c "%a" "${test_file}")
+  perms=$(stat -c "%a" "${test_file}" 2>/dev/null || stat -f "%Lp" "${test_file}")
   [[ "${perms}" == "644" ]]
 }
 
@@ -105,7 +105,7 @@ teardown() {
   echo "test" | io::atomic_write "${test_file}" 0600
 
   local perms
-  perms=$(stat -c "%a" "${test_file}")
+  perms=$(stat -c "%a" "${test_file}" 2>/dev/null || stat -f "%Lp" "${test_file}")
   [[ "${perms}" == "600" ]]
 }
 
@@ -175,7 +175,7 @@ teardown() {
   io::install_file "${src}" "${dst}"
 
   local perms
-  perms=$(stat -c "%a" "${dst}")
+  perms=$(stat -c "%a" "${dst}" 2>/dev/null || stat -f "%Lp" "${dst}")
   [[ "${perms}" == "755" ]]
 }
 
@@ -187,7 +187,7 @@ teardown() {
   io::install_file "${src}" "${dst}" 0644
 
   local perms
-  perms=$(stat -c "%a" "${dst}")
+  perms=$(stat -c "%a" "${dst}" 2>/dev/null || stat -f "%Lp" "${dst}")
   [[ "${perms}" == "644" ]]
 }
 
@@ -312,7 +312,7 @@ teardown() {
 
   [ -f "${test_file}" ]
   local perms
-  perms=$(stat -c "%a" "${test_file}")
+  perms=$(stat -c "%a" "${test_file}" 2>/dev/null || stat -f "%Lp" "${test_file}")
   [[ "${perms}" == "600" ]]
 
   # Verify content wasn't tampered with

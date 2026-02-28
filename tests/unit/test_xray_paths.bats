@@ -349,3 +349,48 @@ teardown() {
   [ "${line_count}" -eq 1 ]
   [ "${#output}" -eq 16 ]
 }
+
+# Test: xray version parsing helpers
+@test "xray::parse_version_text - parses semver from xray output" {
+  run xray::parse_version_text "Xray 26.2.6 (Xray, Penetrates Everything.)"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "v26.2.6" ]]
+}
+
+@test "xray::parse_version_text - accepts existing v prefix" {
+  run xray::parse_version_text "Xray v26.2.6 custom-build"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "v26.2.6" ]]
+}
+
+@test "xray::parse_version_text - returns empty on invalid output" {
+  run xray::parse_version_text "Xray unknown version"
+  [ "$status" -eq 0 ]
+  [[ -z "$output" ]]
+}
+
+@test "xray::installed_version - returns unknown for missing binary" {
+  run xray::installed_version "/nonexistent/xray"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "unknown" ]]
+}
+
+@test "xray::installed_version - falls back from -version to version command" {
+  local mock_bin="${TEST_TMPDIR}/mock-xray"
+  cat > "${mock_bin}" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-version" ]]; then
+  exit 1
+fi
+if [[ "${1:-}" == "version" ]]; then
+  echo "Xray 26.2.6 (mock build)"
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "${mock_bin}"
+
+  run xray::installed_version "${mock_bin}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "v26.2.6" ]]
+}

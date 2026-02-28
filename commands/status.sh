@@ -9,7 +9,7 @@ main() {
   local xray_bin
   xray_bin="$(xray::bin)"
   if [[ -x "${xray_bin}" ]]; then
-    ver="$("${xray_bin}" -version 2> /dev/null | awk 'NR==1{print $2}')"
+    ver="$(xray::installed_version "${xray_bin}")"
   fi
 
   local active_confdir

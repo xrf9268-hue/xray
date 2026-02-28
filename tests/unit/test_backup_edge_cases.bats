@@ -133,7 +133,7 @@ teardown() {
   backup_file=$(find "${backup_dir}" -name "perms-test-*.tar.gz" | head -1)
 
   local perms
-  perms=$(stat -c "%a" "${backup_file}")
+  perms=$(stat -c "%a" "${backup_file}" 2>/dev/null || stat -f "%Lp" "${backup_file}")
   [[ "${perms}" == "600" ]]
 }
 
@@ -149,7 +149,7 @@ teardown() {
   meta_file=$(find "${backup_dir}" -name "meta-perms-*.metadata.json" | head -1)
 
   local perms
-  perms=$(stat -c "%a" "${meta_file}")
+  perms=$(stat -c "%a" "${meta_file}" 2>/dev/null || stat -f "%Lp" "${meta_file}")
   [[ "${perms}" == "600" ]]
 }
 

@@ -18,6 +18,7 @@ This directory contains Architecture Decision Records for the xray-fusion projec
 | [010](./010-phase1-security-enhancements.md) | Phase 1 Security Enhancements | 2025-11-10 | Accepted |
 | [011](./011-xray-v25-review.md) | Xray v25.12.8 Updates Review | 2025-12-09 | Accepted |
 | [012](./012-xray-v26-review.md) | Xray v26.1.23 Updates Review | 2026-01-24 | Accepted |
+| [013](./013-xray-v26.2.6-review.md) | Xray v26.2.6 Alignment and Forward Compatibility | 2026-02-28 | Accepted |
 
 ## ADR Format
 

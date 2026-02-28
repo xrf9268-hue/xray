@@ -117,3 +117,72 @@ xray::verify_file_checksum() {
 
   return 0
 }
+
+##
+# Extract latest release tag from GitHub release API JSON payload.
+#
+# Arguments:
+#   $1 - JSON payload content (string, required)
+#
+# Output:
+#   Normalized release tag (vX.Y.Z) or empty string if unavailable/invalid
+#
+# Returns:
+#   0 - Always succeeds
+##
+xray::extract_latest_tag_from_release_json() {
+  local payload="${1:-}" tag=""
+  [[ -z "${payload}" ]] && return 0
+
+  # Prefer jq when available.
+  if command -v jq > /dev/null 2>&1; then
+    tag="$(printf '%s' "${payload}" | jq -r '.tag_name // empty' 2> /dev/null || true)"
+  fi
+
+  # Fallback parser for environments without jq.
+  if [[ -z "${tag}" ]]; then
+    tag="$(
+      printf '%s' "${payload}" \
+        | grep -oE '"tag_name"[[:space:]]*:[[:space:]]*"[^"]+"' \
+        | head -1 \
+        | sed -E 's/.*"([^"]+)"/\1/'
+    )"
+  fi
+
+  if [[ ! "${tag}" =~ ^v?[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    printf ''
+    return 0
+  fi
+  [[ "${tag}" =~ ^v ]] || tag="v${tag}"
+  printf '%s' "${tag}"
+  return 0
+}
+
+##
+# Resolve latest stable release tag from GitHub API.
+#
+# Arguments:
+#   $1 - Optional API URL (string, optional)
+#
+# Output:
+#   Release tag (vX.Y.Z)
+#
+# Returns:
+#   0 - Success
+#   1 - Failed to fetch/parse latest tag
+##
+xray::resolve_latest_tag() {
+  local api_url="${1:-https://api.github.com/repos/XTLS/Xray-core/releases/latest}"
+  local payload tag
+
+  if declare -f core::retry > /dev/null 2>&1; then
+    payload="$(core::retry 3 curl -fsSL "${api_url}" 2> /dev/null)" || return 1
+  else
+    payload="$(curl -fsSL "${api_url}" 2> /dev/null)" || return 1
+  fi
+
+  tag="$(xray::extract_latest_tag_from_release_json "${payload}")"
+  [[ -n "${tag}" ]] || return 1
+  printf '%s' "${tag}"
+  return 0
+}

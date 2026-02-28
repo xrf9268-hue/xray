@@ -13,7 +13,7 @@ need() { command -v "${1}" > /dev/null 2>&1 || {
 }; }
 
 xray::install() {
-  local version="${1:-latest}" arch_u url url_tmpl sha
+  local version="${1:-latest}" arch_u url url_tmpl sha tmp
   need curl
   need unzip
   arch_u="$(uname -m)"
@@ -35,16 +35,9 @@ xray::install() {
   fi
 
   if [[ "${version}" == "latest" ]]; then
-    version=$(curl -fsSL https://api.github.com/repos/XTLS/Xray-core/releases/latest | grep -o '"tag_name":[[:space:]]*"[^"]*"' | cut -d'"' -f4)
-    [[ -n "${version}" && "${version}" != "null" ]] || {
-      core::log error "resolve latest failed" "{}"
-      exit 1
-    }
-
-    # Security: Validate resolved version format
-    if [[ ! "${version}" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
-      core::log error "invalid resolved version format" "$(printf '{"version":"%s"}' "${version}")"
-      exit 1
+    if ! version="$(xray::resolve_latest_tag)"; then
+      core::log error "resolve latest failed" '{"api":"https://api.github.com/repos/XTLS/Xray-core/releases/latest"}'
+      return 1
     fi
   fi
   [[ "${version}" =~ ^v ]] || version="v${version}"
@@ -53,11 +46,11 @@ xray::install() {
   sha="${XRAY_SHA256:-}"
 
   tmp="$(mktemp -d)"
-  trap 'rm -rf "${tmp}"' EXIT
   core::log info "downloading xray" "$(printf '{"url":"%s","version":"%s"}' "${url}" "${version}")"
-  if ! curl -fsSL "${url}" -o "${tmp}/xray.zip"; then
+  if ! core::retry 3 curl -fsSL "${url}" -o "${tmp}/xray.zip"; then
     core::log error "download failed" "$(printf '{"url":"%s","hint":"Check network or try: XRAY_URL=<mirror-url>"}' "${url}")"
-    exit 4
+    rm -rf "${tmp}" 2> /dev/null || true
+    return 4
   fi
 
   if [[ -z "${sha}" ]]; then
@@ -76,23 +69,40 @@ xray::install() {
   if [[ -n "${sha}" ]]; then
     if ! xray::validate_sha256_format "${sha}"; then
       core::log error "invalid SHA256 format" "$(printf '{"sha256":"%s","source":"dgst_file"}' "${sha}")"
-      exit 5
+      rm -rf "${tmp}" 2> /dev/null || true
+      return 5
     fi
   else
     core::log error "missing SHA256 checksum" "$(printf '{"dgst_url":"%s.dgst","hint":"Network issue or file unavailable"}' "${url}")"
     core::log info "workaround: manually verify and set checksum" "$(printf '{"example":"XRAY_SHA256=<64-char-hex> xrf install ...","get_checksum":"curl -fsSL %s.dgst"}' "${url}")"
-    exit 5
+    rm -rf "${tmp}" 2> /dev/null || true
+    return 5
   fi
 
   # Verify file checksum
   if ! xray::verify_file_checksum "${tmp}/xray.zip" "${sha}"; then
-    exit 6
+    rm -rf "${tmp}" 2> /dev/null || true
+    return 6
   fi
 
-  (cd "${tmp}" && unzip -q xray.zip)
-  io::ensure_dir "$(xray::prefix)/bin" 0755
-  io::install_file "${tmp}/xray" "$(xray::bin)" 0755
-  user::ensure_system_user xray xray
+  if ! (cd "${tmp}" && unzip -q xray.zip); then
+    core::log error "failed to unzip xray package" "$(printf '{"file":"%s"}' "${tmp}/xray.zip")"
+    rm -rf "${tmp}" 2> /dev/null || true
+    return 7
+  fi
+  if ! io::ensure_dir "$(xray::prefix)/bin" 0755; then
+    rm -rf "${tmp}" 2> /dev/null || true
+    return 7
+  fi
+  if ! io::install_file "${tmp}/xray" "$(xray::bin)" 0755; then
+    rm -rf "${tmp}" 2> /dev/null || true
+    return 7
+  fi
+  if ! user::ensure_system_user xray xray; then
+    rm -rf "${tmp}" 2> /dev/null || true
+    return 7
+  fi
+  rm -rf "${tmp}" 2> /dev/null || true
   core::log info "installed" "$(printf '{"bin":"%s"}' "$(xray::bin)")"
 }
 

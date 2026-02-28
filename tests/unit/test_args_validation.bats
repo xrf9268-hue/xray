@@ -123,3 +123,29 @@ teardown() {
   run args::validate_config
   [ "$status" -eq 0 ]
 }
+
+@test "args::parse - accepts --enable-vless-encryption" {
+  args::parse --enable-vless-encryption
+  [[ "${VLESS_ENCRYPTION_ENABLED}" == "true" ]]
+}
+
+@test "args::parse - accepts --vless-decryption value" {
+  args::parse --vless-decryption "mlkem768x25519plus.native.600s.testkey"
+  [[ "${VLESS_DECRYPTION}" == "mlkem768x25519plus.native.600s.testkey" ]]
+}
+
+@test "args::parse - accepts --vless-encryption value" {
+  args::parse --vless-encryption "mlkem768x25519plus.native.0rtt.clientkey"
+  [[ "${VLESS_ENCRYPTION}" == "mlkem768x25519plus.native.0rtt.clientkey" ]]
+}
+
+@test "args::export_vars - exports vless encryption variables" {
+  args::parse --enable-vless-encryption \
+    --vless-decryption "mlkem768x25519plus.native.600s.serverkey" \
+    --vless-encryption "mlkem768x25519plus.native.0rtt.clientkey"
+  args::export_vars
+
+  [[ "${XRAY_VLESS_ENCRYPTION_ENABLED}" == "true" ]]
+  [[ "${XRAY_VLESS_DECRYPTION}" == "mlkem768x25519plus.native.600s.serverkey" ]]
+  [[ "${XRAY_VLESS_ENCRYPTION}" == "mlkem768x25519plus.native.0rtt.clientkey" ]]
+}

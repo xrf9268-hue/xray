@@ -26,6 +26,7 @@ readonly DEFAULT_XRAY_CERT_DIR="/usr/local/etc/xray/certs"
 readonly DEFAULT_XRAY_SNI="www.microsoft.com"
 readonly DEFAULT_XRAY_SNIFFING="false"
 readonly DEFAULT_XRAY_FINGERPRINT="chrome"
+readonly DEFAULT_XRAY_VLESS_ENCRYPTION_ENABLED="false"
 
 # === Logging Defaults ===
 readonly DEFAULT_XRAY_LOG_LEVEL="warning"

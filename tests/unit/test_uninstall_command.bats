@@ -1,5 +1,6 @@
 #!/usr/bin/env bats
 # Unit tests for commands/uninstall.sh
+# shellcheck disable=SC2218
 
 load ../test_helper
 

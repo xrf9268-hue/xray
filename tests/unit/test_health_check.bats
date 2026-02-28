@@ -173,6 +173,7 @@ setup() {
   [[ "$output" =~ "Configuration" ]]
   [[ "$output" =~ "Network" ]]
   [[ "$output" =~ "Certificates" ]]
+  [[ "$output" =~ "Compatibility" ]]
 }
 
 @test "health::run - text format shows checkmark or cross" {
@@ -211,6 +212,7 @@ setup() {
   [[ "$output" =~ '"config"' ]]
   [[ "$output" =~ '"network"' ]]
   [[ "$output" =~ '"certificates"' ]]
+  [[ "$output" =~ '"compatibility"' ]]
 }
 
 @test "health::run - JSON format shows passed status" {
@@ -238,6 +240,7 @@ setup() {
   [ "$(type -t health::check_config)" = "function" ]
   [ "$(type -t health::check_network)" = "function" ]
   [ "$(type -t health::check_certificates)" = "function" ]
+  [ "$(type -t health::check_compatibility)" = "function" ]
   [ "$(type -t health::run)" = "function" ]
 }
 
@@ -256,6 +259,20 @@ setup() {
 
   run health::run
   [ "$status" -eq 1 ]
+}
+
+@test "health::check_compatibility - detects deprecated allowInsecure in active config" {
+  local active_dir="${BATS_TEST_TMPDIR}/active"
+  mkdir -p "${active_dir}"
+  xray::active() { echo "${active_dir}"; }
+
+  cat > "${active_dir}/05_inbounds.json" <<'JSON'
+{"inbounds":[{"streamSettings":{"tlsSettings":{"allowInsecure":true}}}]}
+JSON
+
+  run health::check_compatibility
+  [ "$status" -eq 1 ]
+  [[ "$output" =~ "allowInsecure" ]]
 }
 
 # ============================================================================

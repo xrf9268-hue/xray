@@ -104,11 +104,18 @@ health::check_config() {
 
   # Run configuration test
   # xray -test returns 0 if config is valid
-  if "${xray_bin}" -test -confdir "${config_dir}" > /dev/null 2>&1; then
+  local test_output
+  if test_output="$("${xray_bin}" -test -confdir "${config_dir}" 2>&1)"; then
+    local compat_warning
+    while IFS= read -r compat_warning; do
+      [[ -n "${compat_warning}" ]] || continue
+      core::log warn "${compat_warning}" "$(printf '{"source":"xray-test"}')"
+    done < <(xray::extract_compat_warnings "${test_output}")
     core::log debug "xray configuration is valid" "{}"
     return 0
   else
     core::log warn "xray configuration is invalid" "{}"
+    [[ -n "${test_output}" ]] && printf '%s\n' "${test_output}" >&2
     return 1
   fi
 }
@@ -289,6 +296,42 @@ health::check_certificates() {
 }
 
 ##
+# Check configuration compatibility against known Xray deprecations.
+#
+# Scans rendered JSON files for known deprecated fields and emits warning
+# messages. This check is informational and should not block installation.
+#
+# Returns:
+#   0 - No known deprecated settings detected
+#   1 - One or more compatibility warnings detected (informational)
+##
+health::check_compatibility() {
+  core::log debug "checking compatibility warnings" "{}"
+
+  local config_dir
+  config_dir="$(xray::active)"
+  if [[ ! -d "${config_dir}" ]]; then
+    core::log warn "xray active config directory not found for compatibility check" "$(printf '{"path":"%s"}' "${config_dir}")"
+    return 1
+  fi
+
+  if ! compgen -G "${config_dir}"'/*.json' > /dev/null; then
+    core::log warn "xray config files missing for compatibility check" "$(printf '{"path":"%s"}' "${config_dir}")"
+    return 1
+  fi
+
+  local combined warnings
+  combined="$(cat "${config_dir}"/*.json 2> /dev/null || true)"
+  warnings="$(xray::extract_compat_warnings "${combined}")"
+  if [[ -z "${warnings}" ]]; then
+    return 0
+  fi
+
+  printf '%s\n' "${warnings}"
+  return 1
+}
+
+##
 # Run comprehensive health check
 #
 # Runs all health checks and returns overall status.
@@ -318,11 +361,18 @@ health::run() {
   local config_ok=0
   local network_ok=0
   local certs_ok=0
+  local compat_ok=0
+  local compat_output=""
 
   health::check_service && service_ok=1 || service_ok=0
   health::check_config && config_ok=1 || config_ok=0
   health::check_network && network_ok=1 || network_ok=0
   health::check_certificates && certs_ok=1 || certs_ok=0
+  if compat_output="$(health::check_compatibility)"; then
+    compat_ok=1
+  else
+    compat_ok=0
+  fi
 
   # Calculate overall status
   local all_passed=0
@@ -331,7 +381,7 @@ health::run() {
   fi
 
   # Get detailed status messages
-  local service_msg config_msg network_msg certs_msg
+  local service_msg config_msg network_msg certs_msg compat_msg
   if [[ "${service_ok}" -eq 1 ]]; then
     service_msg="xray.service is active (running)"
   else
@@ -367,6 +417,12 @@ health::run() {
     certs_msg="Missing or expired certificates"
   fi
 
+  if [[ "${compat_ok}" -eq 1 ]]; then
+    compat_msg="No known deprecated settings detected"
+  else
+    compat_msg="${compat_output:-Compatibility warnings detected; inspect logs}"
+  fi
+
   # shellcheck disable=SC2154  # XRF_JSON is set by core::init
   if [[ "${XRF_JSON}" == "true" ]]; then
     # JSON format
@@ -378,7 +434,8 @@ health::run() {
     "service": {"passed": $([ "${service_ok}" -eq 1 ] && echo "true" || echo "false"), "message": "${service_msg}"},
     "config": {"passed": $([ "${config_ok}" -eq 1 ] && echo "true" || echo "false"), "message": "${config_msg}"},
     "network": {"passed": $([ "${network_ok}" -eq 1 ] && echo "true" || echo "false"), "message": "${network_msg}"},
-    "certificates": {"passed": $([ "${certs_ok}" -eq 1 ] && echo "true" || echo "false"), "message": "${certs_msg}"}
+    "certificates": {"passed": $([ "${certs_ok}" -eq 1 ] && echo "true" || echo "false"), "message": "${certs_msg}"},
+    "compatibility": {"passed": $([ "${compat_ok}" -eq 1 ] && echo "true" || echo "false"), "message": "${compat_msg}"}
   },
   "overall": $([ "${all_passed}" -eq 1 ] && echo "true" || echo "false")
 }
@@ -392,6 +449,7 @@ EOF
     printf '  %s Configuration     %s\n' "$([ "${config_ok}" -eq 1 ] && echo "✓" || echo "✗")" "${config_msg}"
     printf '  %s Network           %s\n' "$([ "${network_ok}" -eq 1 ] && echo "✓" || echo "✗")" "${network_msg}"
     printf '  %s Certificates      %s\n' "$([ "${certs_ok}" -eq 1 ] && echo "✓" || echo "✗")" "${certs_msg}"
+    printf '  %s Compatibility     %s\n' "$([ "${compat_ok}" -eq 1 ] && echo "✓" || echo "!")" "${compat_msg}"
     printf '\n'
 
     if [[ "${all_passed}" -eq 1 ]]; then

@@ -19,6 +19,7 @@ Checks performed:
   - Configuration     (xray config validation)
   - Network           (port listening checks)
   - Certificates      (validity check for vision-reality)
+  - Compatibility     (deprecated setting warnings)
 
 Examples:
   # Run health check
