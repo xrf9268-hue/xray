@@ -27,6 +27,7 @@ setup() {
   XRAY_CONFIG_00_LOG="00_log.json"
   XRAY_CONFIG_05_INBOUNDS="05_inbounds.json"
   XRAY_CONFIG_06_OUTBOUNDS="06_outbounds.json"
+  XRAY_CONFIG_07_DNS="07_dns.json"
   XRAY_CONFIG_09_ROUTING="09_routing.json"
 
   # Define helper functions inline (extracted from configure.sh)
@@ -167,6 +168,7 @@ setup() {
 
   xray::write_base_configs() {
     local release_dir="${1}"
+    local dns_query_strategy="${2:-UseIPv4}"
     local log_level="${XRAY_LOG_LEVEL:-warning}"
 
     printf '{"log":{"access":"none","error":"none","loglevel":"%s"}}' "${log_level}" \
@@ -174,6 +176,9 @@ setup() {
 
     printf '{"outbounds":[{"protocol":"freedom","tag":"direct"},{"protocol":"blackhole","tag":"block"}]}' \
       | io::atomic_write "${release_dir}/${XRAY_CONFIG_06_OUTBOUNDS}" 0640
+
+    printf '{"dns":{"queryStrategy":"%s"}}' "${dns_query_strategy}" \
+      | io::atomic_write "${release_dir}/${XRAY_CONFIG_07_DNS}" 0640
 
     printf '{"routing":{"domainStrategy":"IPIfNonMatch","rules":[]}}' \
       | io::atomic_write "${release_dir}/${XRAY_CONFIG_09_ROUTING}" 0640
@@ -437,6 +442,13 @@ line2" "test")"
   [ -f "${TEST_TMPDIR}/release/09_routing.json" ]
 }
 
+@test "xray::write_base_configs creates DNS config" {
+  mkdir -p "${TEST_TMPDIR}/release"
+
+  xray::write_base_configs "${TEST_TMPDIR}/release"
+  [ -f "${TEST_TMPDIR}/release/07_dns.json" ]
+}
+
 @test "xray::write_base_configs log config contains loglevel" {
   mkdir -p "${TEST_TMPDIR}/release"
   export XRAY_LOG_LEVEL="info"
@@ -461,6 +473,14 @@ line2" "test")"
   xray::write_base_configs "${TEST_TMPDIR}/release"
   content="$(cat "${TEST_TMPDIR}/release/09_routing.json")"
   [[ "${content}" == *'"domainStrategy":"IPIfNonMatch"'* ]]
+}
+
+@test "xray::write_base_configs DNS defaults to UseIPv4 strategy" {
+  mkdir -p "${TEST_TMPDIR}/release"
+
+  xray::write_base_configs "${TEST_TMPDIR}/release"
+  content="$(cat "${TEST_TMPDIR}/release/07_dns.json")"
+  [[ "${content}" == *'"queryStrategy":"UseIPv4"'* ]]
 }
 
 # === deploy_release Path Validation Tests ===
@@ -502,6 +522,10 @@ line2" "test")"
 
 @test "XRAY_CONFIG_06_OUTBOUNDS is correct" {
   [ "${XRAY_CONFIG_06_OUTBOUNDS}" = "06_outbounds.json" ]
+}
+
+@test "XRAY_CONFIG_07_DNS is correct" {
+  [ "${XRAY_CONFIG_07_DNS}" = "07_dns.json" ]
 }
 
 @test "XRAY_CONFIG_09_ROUTING is correct" {

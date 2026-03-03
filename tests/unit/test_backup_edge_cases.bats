@@ -286,6 +286,21 @@ teardown() {
   [ "$status" -eq 0 ]
 }
 
+@test "backup::verify - succeeds for encrypted backup file" {
+  local backup_dir
+  backup_dir="$(backup::dir)"
+  mkdir -p "${backup_dir}"
+
+  local enc_file="${backup_dir}/enc-valid.tar.gz.enc"
+  printf 'encrypted payload\n' > "${enc_file}"
+  local hash
+  hash=$(sha256sum "${enc_file}" | awk '{print $1}')
+  jq -n --arg hash "${hash}" '{name:"enc-valid",hash:$hash,encrypted:true}' > "${backup_dir}/enc-valid.metadata.json"
+
+  run backup::verify "enc-valid"
+  [ "$status" -eq 0 ]
+}
+
 # =============================================================================
 # backup::delete edge cases
 # =============================================================================
@@ -315,6 +330,20 @@ teardown() {
   # Verify files are gone
   [ ! -f "${backup_dir}/delete-test.tar.gz" ]
   [ ! -f "${backup_dir}/delete-test.metadata.json" ]
+}
+
+@test "backup::delete - removes encrypted backup and metadata" {
+  local backup_dir
+  backup_dir="$(backup::dir)"
+  mkdir -p "${backup_dir}"
+
+  printf 'encrypted payload\n' > "${backup_dir}/enc-delete.tar.gz.enc"
+  jq -n '{name:"enc-delete",hash:"dummy",encrypted:true}' > "${backup_dir}/enc-delete.metadata.json"
+
+  run backup::delete "enc-delete"
+  [ "$status" -eq 0 ]
+  [ ! -f "${backup_dir}/enc-delete.tar.gz.enc" ]
+  [ ! -f "${backup_dir}/enc-delete.metadata.json" ]
 }
 
 @test "backup::delete - succeeds if only metadata exists" {

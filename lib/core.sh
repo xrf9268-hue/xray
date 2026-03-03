@@ -310,32 +310,105 @@ core::log() {
 }
 
 ##
-# Retry command with exponential backoff
+# Determine whether a failed attempt should be retried.
 #
-# Executes a command up to max_attempts times, with exponentially
-# increasing delays between attempts (1s, 4s, 9s, 16s, 25s, ...).
-# Formula: sleep(attempt^2)
+# Arguments:
+#   $1 - Exit code from the failed command (number, required)
+#   $2 - Command name (string, optional)
+#
+# Returns:
+#   0 - Retriable failure
+#   1 - Non-retriable failure
+##
+core::_retry_is_retriable() {
+  local rc="${1:-1}" cmd_name="${2:-}"
+  cmd_name="${cmd_name##*/}"
+
+  if [[ "${cmd_name}" == "curl" ]]; then
+    case "${rc}" in
+      # Name resolution, connection, timeout, TLS/connect reset classes.
+      6 | 7 | 28 | 35 | 52 | 56) return 0 ;;
+      # curl -f HTTP errors are usually deterministic (4xx/5xx).
+      22) return 1 ;;
+    esac
+  fi
+
+  return 0
+}
+
+##
+# Retry command with exponential backoff and jitter.
+#
+# Uses Google SRE-style retry pacing:
+#   delay = min(base_delay^(attempt-1), max_delay)
+#   sleep = delay + random(0..jitter_max_ms)/1000
 #
 # Arguments:
 #   $1 - Maximum attempts (number, optional, default: 3)
 #   $@ - Command and arguments to execute (required)
 #
+# Environment:
+#   XRF_RETRY_BASE_DELAY     Base multiplier for backoff (default: 2)
+#   XRF_RETRY_MAX_DELAY      Maximum backoff in seconds (default: 32)
+#   XRF_RETRY_JITTER_MAX_MS  Maximum jitter in milliseconds (default: 1000)
+#
 # Returns:
 #   0 - Command succeeded within max_attempts
-#   1 - All attempts failed
+#   N - Last command exit code when attempts are exhausted / non-retriable
 #
 # Example:
 #   core::retry 5 curl -fsSL https://example.com/file
 #   core::retry wget -O /tmp/file https://example.com/file  # Uses default 3 attempts
 ##
 core::retry() {
-  local max_attempts="${1:-3}"
-  shift
-  local attempt=0
-  until "${@}"; do
+  local max_attempts=3
+  if [[ $# -gt 0 && "${1}" =~ ^[0-9]+$ ]]; then
+    max_attempts="${1}"
+    shift
+  fi
+
+  # Keep historical behavior: no command means nothing to retry.
+  [[ $# -gt 0 ]] || return 0
+  [[ "${max_attempts}" -ge 1 ]] || return 1
+
+  local base_delay="${XRF_RETRY_BASE_DELAY:-2}"
+  local max_delay="${XRF_RETRY_MAX_DELAY:-32}"
+  local jitter_max_ms="${XRF_RETRY_JITTER_MAX_MS:-1000}"
+  [[ "${base_delay}" =~ ^[0-9]+$ && "${base_delay}" -ge 1 ]] || base_delay=2
+  [[ "${max_delay}" =~ ^[0-9]+$ && "${max_delay}" -ge 1 ]] || max_delay=32
+  [[ "${jitter_max_ms}" =~ ^[0-9]+$ ]] || jitter_max_ms=1000
+
+  local attempt=1 rc=0 delay=0 jitter_ms=0 sleep_value cmd_name
+  cmd_name="${1}"
+
+  while true; do
+    "${@}" && return 0
+    rc=$?
+
+    if ((attempt >= max_attempts)); then
+      return "${rc}"
+    fi
+
+    if ! core::_retry_is_retriable "${rc}" "${cmd_name}"; then
+      return "${rc}"
+    fi
+
+    delay=$((base_delay ** (attempt - 1)))
+    ((delay > max_delay)) && delay="${max_delay}"
+
+    jitter_ms=0
+    if ((jitter_max_ms > 0)); then
+      jitter_ms=$((RANDOM % (jitter_max_ms + 1)))
+    fi
+
+    if ((jitter_ms > 0)); then
+      printf -v sleep_value '%d.%03d' "${delay}" "${jitter_ms}"
+    else
+      sleep_value="${delay}"
+    fi
+
+    sleep "${sleep_value}"
     attempt=$((attempt + 1))
-    [[ ${attempt} -ge ${max_attempts} ]] && return 1
-    sleep $((attempt * attempt))
   done
 }
 

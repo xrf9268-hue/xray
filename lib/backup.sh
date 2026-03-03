@@ -41,6 +41,86 @@ backup::_require_jq() {
 }
 
 ##
+# Internal: Check if openssl is available
+#
+# Returns:
+#   0 - openssl is available
+#   1 - openssl is not available
+##
+backup::_require_openssl() {
+  if ! command -v openssl > /dev/null 2>&1; then
+    core::log error "openssl is required for encrypted backups" '{"hint":"Install with: apt install openssl / yum install openssl / brew install openssl"}'
+    return 1
+  fi
+  return 0
+}
+
+##
+# Internal: Validate encryption password strength
+#
+# Arguments:
+#   $1 - Password (required)
+#
+# Returns:
+#   0 - Password is valid
+#   1 - Password is invalid
+##
+backup::_validate_password() {
+  local password="${1:-}"
+  if [[ -z "${password}" || "${#password}" -lt 32 ]]; then
+    core::log error "encryption password must be at least 32 characters" '{}'
+    return 1
+  fi
+  return 0
+}
+
+##
+# Internal: Generate random encryption password
+#
+# Output:
+#   Generated password to stdout
+#
+# Returns:
+#   0 - Password generated
+#   1 - Failed to generate
+##
+backup::_generate_password() {
+  backup::_require_openssl || return 1
+  openssl rand -base64 48 | tr -d '\r\n'
+}
+
+##
+# Internal: Resolve backup archive file path and encryption flag
+#
+# Arguments:
+#   $1 - Backup name (required)
+#
+# Output:
+#   "<archive_path>\t<encrypted_flag>"
+#
+# Returns:
+#   0 - Archive found
+#   1 - Archive not found
+##
+backup::_resolve_archive() {
+  local name="${1:?backup name required}"
+  local backup_dir plain_file enc_file
+  backup_dir="$(backup::dir)"
+  plain_file="${backup_dir}/${name}.tar.gz"
+  enc_file="${backup_dir}/${name}.tar.gz.enc"
+
+  if [[ -f "${plain_file}" ]]; then
+    printf '%s\tfalse\n' "${plain_file}"
+    return 0
+  fi
+  if [[ -f "${enc_file}" ]]; then
+    printf '%s\ttrue\n' "${enc_file}"
+    return 0
+  fi
+  return 1
+}
+
+##
 # Get backup directory path
 #
 # Returns the backup storage directory path, respecting XRF_VAR override.
@@ -92,8 +172,17 @@ backup::create() {
   backup::_require_jq || return 1
 
   local name="${1:-}"
+  local encrypt="${2:-false}"
+  local password="${3:-}"
   local timestamp
   timestamp="$(date +%Y%m%d-%H%M%S)"
+  # shellcheck disable=SC2034  # Used by commands/backup.sh to print generated password once.
+  BACKUP_LAST_PASSWORD=""
+
+  if [[ "${encrypt}" != "true" && "${encrypt}" != "false" ]]; then
+    core::log error "invalid encrypt flag" "$(printf '{"encrypt":"%s"}' "${encrypt}")"
+    return 1
+  fi
 
   # Generate backup name if not provided
   if [[ -z "${name}" ]]; then
@@ -112,6 +201,19 @@ backup::create() {
   local metadata_file="${backup_dir}/${name}.metadata.json"
 
   core::log info "creating backup" "$(printf '{"name":"%s","file":"%s"}' "${name}" "${backup_file}")"
+
+  local encrypted=false
+  if [[ "${encrypt}" == "true" ]]; then
+    backup::_require_openssl || return 1
+    if [[ -n "${password}" ]]; then
+      backup::_validate_password "${password}" || return 1
+    else
+      password="$(backup::_generate_password)" || return 1
+      backup::_validate_password "${password}" || return 1
+      # shellcheck disable=SC2034  # Used by commands/backup.sh to print generated password once.
+      BACKUP_LAST_PASSWORD="${password}"
+    fi
+  fi
 
   # Load current state
   local state
@@ -163,6 +265,18 @@ backup::create() {
   # Cleanup temporary directory (archive created successfully)
   rm -rf "${tmpdir}" 2> /dev/null || true
 
+  if [[ "${encrypt}" == "true" ]]; then
+    local encrypted_file="${backup_file}.enc"
+    if ! openssl enc -aes-256-cbc -pbkdf2 -salt -in "${backup_file}" -out "${encrypted_file}" -pass "pass:${password}" 2> /dev/null; then
+      core::log error "failed to encrypt backup archive" "$(printf '{"file":"%s"}' "${backup_file}")"
+      rm -f "${backup_file}" "${encrypted_file}" 2> /dev/null || true
+      return 1
+    fi
+    rm -f "${backup_file}" 2> /dev/null || true
+    backup_file="${encrypted_file}"
+    encrypted=true
+  fi
+
   # Set restrictive permissions
   chmod 0600 "${backup_file}" 2> /dev/null || true
 
@@ -182,6 +296,7 @@ backup::create() {
     --arg hash "${backup_hash}" \
     --arg size "${backup_size}" \
     --arg file "${backup_file}" \
+    --argjson encrypted "${encrypted}" \
     '{
       name: $name,
       timestamp: $ts,
@@ -190,6 +305,7 @@ backup::create() {
       hash: $hash,
       size: ($size | tonumber),
       file: $file,
+      encrypted: $encrypted,
       created_at: (now | todate)
     }' > "${metadata_file}"
 
@@ -327,19 +443,19 @@ backup::list() {
 ##
 backup::restore() {
   local name="${1:?backup name required}"
+  local password="${2:-}"
 
   local backup_dir
   backup_dir="$(backup::dir)"
 
   # Find backup file
-  local backup_file metadata_file
-  backup_file="${backup_dir}/${name}.tar.gz"
-  metadata_file="${backup_dir}/${name}.metadata.json"
-
-  if [[ ! -f "${backup_file}" ]]; then
+  local backup_file metadata_file encrypted=false resolved
+  if ! resolved="$(backup::_resolve_archive "${name}")"; then
     core::log error "backup not found" "$(printf '{"name":"%s"}' "${name}")"
     return 1
   fi
+  IFS=$'\t' read -r backup_file encrypted <<< "${resolved}"
+  metadata_file="${backup_dir}/${name}.metadata.json"
 
   if [[ ! -f "${metadata_file}" ]]; then
     core::log error "backup metadata not found" "$(printf '{"name":"%s"}' "${name}")"
@@ -368,7 +484,36 @@ backup::restore() {
   local tmpdir
   tmpdir=$(mktemp -d -t .xray-restore.XXXXXX)
 
-  if ! tar -xzf "${backup_file}" -C "${tmpdir}" 2> /dev/null; then
+  local archive_to_extract="${backup_file}"
+  if [[ "${encrypted}" == "true" ]]; then
+    backup::_require_openssl || {
+      rm -rf "${tmpdir}" 2> /dev/null || true
+      return 1
+    }
+    if [[ -z "${password}" ]]; then
+      if [[ -t 0 ]]; then
+        read -rsp "Encryption password: " password
+        printf '\n'
+      else
+        core::log error "password required for encrypted backup restore" '{"hint":"use xrf backup restore <name> --password <password> or --password-file <file>"}'
+        rm -rf "${tmpdir}" 2> /dev/null || true
+        return 1
+      fi
+    fi
+    backup::_validate_password "${password}" || {
+      rm -rf "${tmpdir}" 2> /dev/null || true
+      return 1
+    }
+    local decrypted_archive="${tmpdir}/decrypted.tar.gz"
+    if ! openssl enc -d -aes-256-cbc -pbkdf2 -in "${backup_file}" -out "${decrypted_archive}" -pass "pass:${password}" 2> /dev/null; then
+      core::log error "failed to decrypt backup archive" "$(printf '{"file":"%s"}' "${backup_file}")"
+      rm -rf "${tmpdir}" 2> /dev/null || true
+      return 1
+    fi
+    archive_to_extract="${decrypted_archive}"
+  fi
+
+  if ! tar -xzf "${archive_to_extract}" -C "${tmpdir}" 2> /dev/null; then
     core::log error "failed to extract backup" "$(printf '{"file":"%s"}' "${backup_file}")"
     rm -rf "${tmpdir}" 2> /dev/null || true
     return 1
@@ -458,11 +603,12 @@ backup::delete() {
   local backup_dir
   backup_dir="$(backup::dir)"
 
-  local backup_file metadata_file
+  local backup_file backup_enc_file metadata_file
   backup_file="${backup_dir}/${name}.tar.gz"
+  backup_enc_file="${backup_dir}/${name}.tar.gz.enc"
   metadata_file="${backup_dir}/${name}.metadata.json"
 
-  if [[ ! -f "${backup_file}" && ! -f "${metadata_file}" ]]; then
+  if [[ ! -f "${backup_file}" && ! -f "${backup_enc_file}" && ! -f "${metadata_file}" ]]; then
     core::log error "backup not found" "$(printf '{"name":"%s"}' "${name}")"
     return 1
   fi
@@ -473,6 +619,14 @@ backup::delete() {
   if [[ -f "${backup_file}" ]]; then
     rm -f "${backup_file}" 2> /dev/null || {
       core::log error "failed to delete backup file" "$(printf '{"file":"%s"}' "${backup_file}")"
+      return 1
+    }
+  fi
+
+  # Delete encrypted backup file
+  if [[ -f "${backup_enc_file}" ]]; then
+    rm -f "${backup_enc_file}" 2> /dev/null || {
+      core::log error "failed to delete encrypted backup file" "$(printf '{"file":"%s"}' "${backup_enc_file}")"
       return 1
     }
   fi
@@ -516,14 +670,13 @@ backup::verify() {
   local backup_dir
   backup_dir="$(backup::dir)"
 
-  local backup_file metadata_file
-  backup_file="${backup_dir}/${name}.tar.gz"
-  metadata_file="${backup_dir}/${name}.metadata.json"
-
-  if [[ ! -f "${backup_file}" ]]; then
+  local backup_file metadata_file resolved _encrypted
+  if ! resolved="$(backup::_resolve_archive "${name}")"; then
     core::log error "backup file not found" "$(printf '{"name":"%s"}' "${name}")"
     return 1
   fi
+  IFS=$'\t' read -r backup_file _encrypted <<< "${resolved}"
+  metadata_file="${backup_dir}/${name}.metadata.json"
 
   if [[ ! -f "${metadata_file}" ]]; then
     core::log error "metadata file not found" "$(printf '{"name":"%s"}' "${name}")"
@@ -578,7 +731,7 @@ backup::_cleanup_old() {
   local backup_files=()
   while IFS= read -r file; do
     backup_files+=("${file}")
-  done < <(find "${backup_dir}" -name "*.tar.gz" -type f 2> /dev/null | sort)
+  done < <(find "${backup_dir}" \( -name "*.tar.gz" -o -name "*.tar.gz.enc" \) -type f 2> /dev/null | sort)
 
   local count="${#backup_files[@]}"
 
@@ -593,7 +746,11 @@ backup::_cleanup_old() {
   for ((i = 0; i < to_delete; i++)); do
     local backup_file="${backup_files[i]}"
     local backup_name
-    backup_name=$(basename "${backup_file}" .tar.gz)
+    if [[ "${backup_file}" == *.tar.gz.enc ]]; then
+      backup_name=$(basename "${backup_file}" .tar.gz.enc)
+    else
+      backup_name=$(basename "${backup_file}" .tar.gz)
+    fi
 
     core::log debug "deleting old backup" "$(printf '{"name":"%s"}' "${backup_name}")"
     backup::delete "${backup_name}" > /dev/null 2>&1 || true

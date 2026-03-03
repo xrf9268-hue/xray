@@ -136,6 +136,37 @@ teardown() {
   [[ "$basename" =~ ^[a-zA-Z0-9_-]+$ ]]
 }
 
+@test "backup::create - creates encrypted backup when encryption enabled" {
+  setup_mock_xray
+  local password="0123456789abcdef0123456789abcdef"
+
+  run backup::create "enc-backup" "true" "${password}"
+  [ "$status" -eq 0 ]
+
+  local backup_dir
+  backup_dir="$(backup::dir)"
+  local enc_file
+  enc_file=$(find "${backup_dir}" -name "enc-backup-*.tar.gz.enc" | head -1)
+  [ -f "${enc_file}" ]
+  [ ! -f "${enc_file%.enc}" ]
+
+  local backup_name
+  backup_name="$(basename "${enc_file}" .tar.gz.enc)"
+  local metadata_file="${backup_dir}/${backup_name}.metadata.json"
+  [ -f "${metadata_file}" ]
+  jq -e '.encrypted == true' "${metadata_file}"
+
+  run backup::verify "${backup_name}"
+  [ "$status" -eq 0 ]
+}
+
+@test "backup::create - rejects weak encryption password" {
+  setup_mock_xray
+
+  run backup::create "enc-weak" "true" "weak-pass"
+  [ "$status" -ne 0 ]
+}
+
 # backup::list tests
 @test "backup::list - shows no backups when directory empty" {
   mkdir -p "$(backup::dir)"

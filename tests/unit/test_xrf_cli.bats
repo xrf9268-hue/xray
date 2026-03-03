@@ -18,7 +18,7 @@ setup() {
 EOF
 
   # Create mock command scripts that just echo their invocation
-  for cmd in install status uninstall logs backup health templates plugin; do
+  for cmd in install status uninstall logs backup health templates plugin export check; do
     cat > "${HERE}/commands/${cmd}.sh" << EOF
 #!/usr/bin/env bash
 echo "${cmd} called with args: \$*"
@@ -42,6 +42,14 @@ echo "links called with args: $*"
 exit 0
 EOF
   chmod +x "${HERE}/services/xray/client-links.sh"
+
+  # Create export command
+  cat > "${HERE}/commands/export.sh" << 'EOF'
+#!/usr/bin/env bash
+echo "export called with args: $*"
+exit 0
+EOF
+  chmod +x "${HERE}/commands/export.sh"
 }
 
 teardown() {
@@ -115,6 +123,20 @@ teardown() {
   [[ "$output" == *"list"* ]]
 }
 
+@test "xrf - dispatches export command" {
+  run "${HERE}/commands/export.sh" uri
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"export called"* ]]
+  [[ "$output" == *"uri"* ]]
+}
+
+@test "xrf - dispatches check command" {
+  run "${HERE}/commands/check.sh" --deep
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"check called"* ]]
+  [[ "$output" == *"--deep"* ]]
+}
+
 # Test usage/help output
 @test "xrf - usage includes all commands" {
   local usage
@@ -127,6 +149,8 @@ Usage: xrf <command>
   links       Print client links
   logs        View, filter, and export Xray logs
   backup      Manage configuration backups
+  export      Export client configuration (uri/v2rayn/clash/sub/qr/all)
+  check       Validate config (supports --deep pipeline)
   test-sni    Test SNI domain for REALITY protocol compatibility
   health      Run post-installation health check
   templates   Manage configuration templates
@@ -141,6 +165,8 @@ EOF
   [[ "${usage}" == *"links"* ]]
   [[ "${usage}" == *"logs"* ]]
   [[ "${usage}" == *"backup"* ]]
+  [[ "${usage}" == *"export"* ]]
+  [[ "${usage}" == *"check"* ]]
   [[ "${usage}" == *"test-sni"* ]]
   [[ "${usage}" == *"health"* ]]
   [[ "${usage}" == *"templates"* ]]
@@ -193,6 +219,18 @@ EOF
   [[ "${desc}" == *"backup"* ]]
 }
 
+@test "xrf - export command has description" {
+  local desc="Export client configuration (uri/v2rayn/clash/sub/qr/all)"
+  [[ "${desc}" == *"Export"* ]]
+  [[ "${desc}" == *"configuration"* ]]
+}
+
+@test "xrf - check command has description" {
+  local desc="Validate config (supports --deep pipeline)"
+  [[ "${desc}" == *"Validate"* ]]
+  [[ "${desc}" == *"--deep"* ]]
+}
+
 @test "xrf - test-sni command has description" {
   local desc="Test SNI domain for REALITY protocol compatibility"
   [[ "${desc}" == *"SNI"* ]]
@@ -221,7 +259,7 @@ EOF
   local exit_code=0
 
   case "${cmd}" in
-    install|status|uninstall|links|logs|backup|test-sni|health|templates|plugin|help|"")
+    install|status|uninstall|links|logs|backup|export|check|test-sni|health|templates|plugin|help|"")
       exit_code=0
       ;;
     *)
@@ -295,6 +333,8 @@ EOF
     "links"
     "logs"
     "backup"
+    "export"
+    "check"
     "test-sni"
     "health"
     "templates"
@@ -302,11 +342,11 @@ EOF
     "help"
   )
 
-  [ "${#commands[@]}" -eq 11 ]
+  [ "${#commands[@]}" -eq 13 ]
 
   for cmd in "${commands[@]}"; do
     case "${cmd}" in
-      install|status|uninstall|links|logs|backup|test-sni|health|templates|plugin|help)
+      install|status|uninstall|links|logs|backup|export|check|test-sni|health|templates|plugin|help)
         # Valid command
         ;;
       *)
@@ -354,6 +394,8 @@ EOF
   [ -x "${HERE}/commands/uninstall.sh" ]
   [ -x "${HERE}/commands/logs.sh" ]
   [ -x "${HERE}/commands/backup.sh" ]
+  [ -x "${HERE}/commands/check.sh" ]
+  [ -x "${HERE}/commands/export.sh" ]
   [ -x "${HERE}/commands/test-sni.sh" ]
   [ -x "${HERE}/commands/health.sh" ]
   [ -x "${HERE}/commands/templates.sh" ]

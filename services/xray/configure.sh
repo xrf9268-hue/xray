@@ -4,6 +4,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 . "${HERE}/lib/core.sh"
 . "${HERE}/lib/errors.sh"
 . "${HERE}/lib/validators.sh"
+. "${HERE}/lib/config_validation.sh"
 . "${HERE}/lib/plugins.sh"
 . "${HERE}/modules/io.sh"
 . "${HERE}/modules/state.sh"
@@ -14,6 +15,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 readonly XRAY_CONFIG_00_LOG="00_log.json"             # Logging configuration (loaded first)
 readonly XRAY_CONFIG_05_INBOUNDS="05_inbounds.json"   # Inbound connections (VLESS/REALITY/Vision)
 readonly XRAY_CONFIG_06_OUTBOUNDS="06_outbounds.json" # Outbound connections (direct/block)
+readonly XRAY_CONFIG_07_DNS="07_dns.json"             # DNS strategy (IPv4-only / dual-stack)
 readonly XRAY_CONFIG_09_ROUTING="09_routing.json"     # Routing rules (loaded last)
 
 core::log debug "configure.sh started" "$(printf '{"args":"%s"}' "$*")"
@@ -164,6 +166,29 @@ digest_confdir() {
   fi
 }
 
+# Detect whether host supports global IPv6 connectivity.
+xray::detect_ipv6_support() {
+  local inet6_file="${XRF_IPV6_IF_INET6_PATH:-/proc/net/if_inet6}"
+  [[ -f "${inet6_file}" ]] || return 1
+  command -v ip > /dev/null 2>&1 || return 1
+  ip -6 addr show 2> /dev/null \
+    | grep -E -q 'inet6[[:space:]]+[0-9a-fA-F:]+/[0-9]+[[:space:]]+scope[[:space:]]+global'
+}
+
+# Resolve listen address and DNS strategy based on IPv6 capability.
+xray::resolve_network_profile() {
+  local listen_ref="${1:?listen_ref required}" dns_ref="${2:?dns_ref required}"
+  local resolved_listen_addr="0.0.0.0" resolved_dns_query_strategy="UseIPv4"
+
+  if xray::detect_ipv6_support; then
+    resolved_listen_addr="::"
+    resolved_dns_query_strategy="UseIP"
+  fi
+
+  printf -v "${listen_ref}" '%s' "${resolved_listen_addr}"
+  printf -v "${dns_ref}" '%s' "${resolved_dns_query_strategy}"
+}
+
 # Prepare release directory with timestamp
 xray::prepare_release_dir() {
   local releases_dir timestamp release_dir
@@ -178,7 +203,16 @@ xray::prepare_release_dir() {
 # Write base configuration files (log, outbounds, routing)
 xray::write_base_configs() {
   local release_dir="${1}"
+  local dns_query_strategy="${2:-UseIPv4}"
   local log_level="${XRAY_LOG_LEVEL:-warning}"
+
+  case "${dns_query_strategy}" in
+    UseIP | UseIPv4 | UseIPv6) ;;
+    *)
+      core::log error "invalid DNS queryStrategy" "$(printf '{"strategy":"%s"}' "${dns_query_strategy}")"
+      return "${ERR_INVALID_ARG}"
+      ;;
+  esac
 
   # Logging configuration
   printf '{"log":{"access":"none","error":"none","loglevel":"%s"}}' "${log_level}" \
@@ -188,17 +222,22 @@ xray::write_base_configs() {
   printf '{"outbounds":[{"protocol":"freedom","tag":"direct"},{"protocol":"blackhole","tag":"block"}]}' \
     | io::atomic_write "${release_dir}/${XRAY_CONFIG_06_OUTBOUNDS}" 0640
 
+  # DNS strategy configuration (IPv4-only or dual-stack auto profile)
+  printf '{"dns":{"queryStrategy":"%s"}}' "${dns_query_strategy}" \
+    | io::atomic_write "${release_dir}/${XRAY_CONFIG_07_DNS}" 0640
+
   # Routing configuration
   printf '{"routing":{"domainStrategy":"IPIfNonMatch","rules":[]}}' \
     | io::atomic_write "${release_dir}/${XRAY_CONFIG_09_ROUTING}" 0640
 
-  core::log debug "base configs written" "$(printf '{"dir":"%s"}' "${release_dir}")"
+  core::log debug "base configs written" "$(printf '{"dir":"%s","dns_query_strategy":"%s"}' "${release_dir}" "${dns_query_strategy}")"
 }
 
 # Render Reality-only inbound configuration
 xray::render_reality_inbound() {
   local release_dir="${1}"
   local sniff_bool="${2}"
+  local listen_addr="${3:-0.0.0.0}"
   local vless_decryption="${XRAY_VLESS_DECRYPTION:-none}"
 
   # Validate required variables
@@ -230,6 +269,7 @@ xray::render_reality_inbound() {
     --arg dest "${reality_dest}" \
     --argjson serverNames "${server_names}" \
     --arg privateKey "${sanitized_key}" \
+    --arg listen_addr "${listen_addr}" \
     --arg decryption "${vless_decryption}" \
     --argjson shortIds "${shortids_pool}" \
     --argjson sniff "${sniff_bool}" \
@@ -237,7 +277,7 @@ xray::render_reality_inbound() {
       inbounds: [
         {
           tag: "reality",
-          listen: "0.0.0.0",
+          listen: $listen_addr,
           port: $port,
           protocol: "vless",
           settings: {clients: [{id: $uuid, flow: "xtls-rprx-vision"}], decryption: $decryption},
@@ -266,6 +306,7 @@ xray::render_reality_inbound() {
 xray::render_vision_reality_inbounds() {
   local release_dir="${1}"
   local sniff_bool="${2}"
+  local listen_addr="${3:-0.0.0.0}"
   local vless_decryption="${XRAY_VLESS_DECRYPTION:-none}"
 
   # Validate required variables
@@ -326,12 +367,13 @@ xray::render_vision_reality_inbounds() {
     --argjson shortIds "${shortids_pool}" \
     --arg dest "${reality_dest}" \
     --arg cert_dir "${XRAY_CERT_DIR}" \
+    --arg listen_addr "${listen_addr}" \
     --argjson sniff "${sniff_bool}" \
     '{
       inbounds: [
         {
           tag: "vision",
-          listen: "0.0.0.0",
+          listen: $listen_addr,
           port: $vision_port,
           protocol: "vless",
           settings: {
@@ -358,7 +400,7 @@ xray::render_vision_reality_inbounds() {
         },
         {
           tag: "reality",
-          listen: "0.0.0.0",
+          listen: $listen_addr,
           port: $reality_port,
           protocol: "vless",
           settings: {clients: [{id: $reality_uuid, flow: "xtls-rprx-vision"}], decryption: $decryption},
@@ -422,7 +464,9 @@ render_release() {
   plugins::emit configure_pre "topology=${topology}" "release_dir=${release_dir}"
 
   # Step 3: Write base configuration files
-  xray::write_base_configs "${release_dir}"
+  local listen_addr dns_query_strategy
+  xray::resolve_network_profile listen_addr dns_query_strategy
+  xray::write_base_configs "${release_dir}" "${dns_query_strategy}"
 
   # Step 4: Determine sniffing mode
   local sniff_bool
@@ -431,10 +475,10 @@ render_release() {
   # Step 5: Render topology-specific inbound configuration
   case "${topology}" in
     reality-only)
-      xray::render_reality_inbound "${release_dir}" "${sniff_bool}"
+      xray::render_reality_inbound "${release_dir}" "${sniff_bool}" "${listen_addr}"
       ;;
     vision-reality)
-      xray::render_vision_reality_inbounds "${release_dir}" "${sniff_bool}"
+      xray::render_vision_reality_inbounds "${release_dir}" "${sniff_bool}" "${listen_addr}"
       ;;
     *)
       core::log fatal "unknown topology" "$(printf '{"topology":"%s"}' "${topology}")"
@@ -472,22 +516,15 @@ deploy_release() {
     return 1
   fi
 
-  if [[ -x "$(xray::bin)" ]]; then
-    local xray_bin test_output
-    xray_bin="$(xray::bin)"
+  if ! config::validate_deep "${release_dir}"; then
+    core::log error "deep configuration validation failed" "$(printf '{"confdir":"%s"}' "${release_dir}")"
+    return 1
+  fi
 
-    if ! test_output="$("${xray_bin}" -test -confdir "${release_dir}" -format json 2>&1)"; then
-      core::log error "xray config test failed" "$(printf '{"confdir":"%s","test_output":"%s"}' "${release_dir//\"/\\\"}" "${test_output}")"
-      printf '%s\n' "${test_output}" >&2
+  if [[ -x "$(xray::bin)" ]]; then
+    if ! config::validate_binary "${release_dir}"; then
       return 1
     fi
-
-    local compat_warning
-    while IFS= read -r compat_warning; do
-      [[ -n "${compat_warning}" ]] || continue
-      core::log warn "${compat_warning}" "$(printf '{"confdir":"%s"}' "${release_dir//\"/\\\"}")"
-    done < <(xray::extract_compat_warnings "${test_output}")
-    core::log debug "xray config test passed" "$(printf '{"confdir":"%s"}' "${release_dir}")"
   fi
   local new_digest
   new_digest="$(digest_confdir "${release_dir}")"

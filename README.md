@@ -39,6 +39,7 @@ curl -sL https://raw.githubusercontent.com/xrf9268-hue/xray/main/install.sh | ba
 | `xrf links` | Connection links |
 | `xrf logs` | View logs |
 | `xrf health` | Health check |
+| `xrf export` | Export configs (`uri/v2rayn/clash/sub/qr/all`) |
 | `xrf uninstall` | Remove installation |
 
 ## Uninstall

@@ -237,6 +237,83 @@ teardown() {
   [[ "${final_count}" -eq 1 ]]
 }
 
+@test "core::retry - uses exponential backoff with max delay cap" {
+  local sleep_log="${TEST_TMPDIR}/sleep.log"
+
+  always_fail() {
+    return 1
+  }
+
+  sleep() {
+    printf '%s\n' "${1}" >> "${sleep_log}"
+  }
+
+  export XRF_RETRY_BASE_DELAY=2
+  export XRF_RETRY_MAX_DELAY=3
+  export XRF_RETRY_JITTER_MAX_MS=0
+
+  run core::retry 4 always_fail
+  [ "${status}" -eq 1 ]
+
+  # Delay sequence with base=2 and cap=3: 1,2,3
+  [[ "$(cat "${sleep_log}")" == $'1\n2\n3' ]]
+}
+
+@test "core::retry - retries retriable curl exit codes" {
+  local attempt_file="${TEST_TMPDIR}/curl-attempts"
+  local sleep_log="${TEST_TMPDIR}/sleep.log"
+  echo "0" > "${attempt_file}"
+
+  curl() {
+    local count
+    count="$(cat "${attempt_file}")"
+    count=$((count + 1))
+    echo "${count}" > "${attempt_file}"
+    if [[ "${count}" -lt 3 ]]; then
+      return 7
+    fi
+    return 0
+  }
+
+  sleep() {
+    printf '%s\n' "${1}" >> "${sleep_log}"
+  }
+
+  export XRF_RETRY_BASE_DELAY=2
+  export XRF_RETRY_MAX_DELAY=10
+  export XRF_RETRY_JITTER_MAX_MS=0
+
+  run core::retry 5 curl -fsSL "https://example.com/file"
+  [ "${status}" -eq 0 ]
+  [[ "$(cat "${attempt_file}")" -eq 3 ]]
+  [[ "$(cat "${sleep_log}")" == $'1\n2' ]]
+}
+
+@test "core::retry - does not retry curl exit code 22" {
+  local attempt_file="${TEST_TMPDIR}/curl-attempts"
+  local sleep_log="${TEST_TMPDIR}/sleep.log"
+  echo "0" > "${attempt_file}"
+
+  curl() {
+    local count
+    count="$(cat "${attempt_file}")"
+    count=$((count + 1))
+    echo "${count}" > "${attempt_file}"
+    return 22
+  }
+
+  sleep() {
+    printf '%s\n' "${1}" >> "${sleep_log}"
+  }
+
+  export XRF_RETRY_JITTER_MAX_MS=0
+
+  run core::retry 5 curl -fsSL "https://example.com/notfound"
+  [ "${status}" -eq 22 ]
+  [[ "$(cat "${attempt_file}")" -eq 1 ]]
+  [ ! -f "${sleep_log}" ]
+}
+
 # =============================================================================
 # core::with_flock edge cases
 # =============================================================================

@@ -40,12 +40,14 @@ curl -sL install.sh | bash -s -- --template office --domain vpn.company.com
 - SNI camouflage (default: `www.microsoft.com`)
 - Port: 443
 - Supports optional VLESS Encryption (`decryption` configurable)
+- Auto network profile: IPv4-only hosts use `listen: 0.0.0.0` + `dns.queryStrategy: UseIPv4`
 
 ### Vision-Reality
 - Domain ownership required
 - Real TLS + Reality fallback
 - Ports: 8443 (Vision), 443 (Reality)
 - VLESS Encryption applies to Reality inbound only (Vision remains `decryption: none`)
+- Auto network profile: IPv6-capable hosts use dual-stack `listen: ::` + `dns.queryStrategy: UseIP`
 
 ## Plugins
 
@@ -67,9 +69,23 @@ xrf plugin info cert-auto
 ```bash
 xrf backup create
 xrf backup create --name pre-upgrade
+xrf backup create --name secure-copy --encrypt
+xrf backup create --name secure-copy --encrypt --password-file /root/backup.pass
 xrf backup list
 xrf backup restore <name>
+xrf backup restore <name> --password-file /root/backup.pass
 xrf backup verify <name>
+```
+
+## Client Export
+
+```bash
+xrf export uri
+xrf export v2rayn
+xrf export clash
+xrf export sub
+xrf export qr
+xrf export all --out-dir /tmp/xrf-export
 ```
 
 ## Environment Variables
