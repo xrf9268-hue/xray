@@ -32,6 +32,7 @@ jobs:
   lint:
     name: Lint (ShellCheck)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
@@ -59,6 +60,7 @@ jobs:
   format-check:
     name: Format Check (shfmt)
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
@@ -94,6 +96,7 @@ jobs:
   unit-tests:
     name: Unit Tests
     runs-on: ubuntu-${{ matrix.ubuntu-version }}
+    timeout-minutes: 15
     strategy:
       matrix:
         # OPTIMIZED: Test on currently supported LTS runners
@@ -146,6 +149,7 @@ jobs:
   integration-tests:
     name: Integration Tests (Sandbox)
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     # IMPROVED: Run on all pushes and PRs (not just PRs)
     # Rationale: 13/21 (62%) tests are runnable, providing valuable feedback
     steps:
@@ -195,6 +199,7 @@ jobs:
   coverage:
     name: Test Coverage Summary
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [unit-tests]  # IMPROVED: Removed lint dependency (not needed)
     # IMPROVED: Run on all branches (not just main)
     # Rationale: Developers should see coverage info during development
@@ -225,6 +230,7 @@ jobs:
   security-scan:
     name: Security Scan
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
@@ -260,6 +266,7 @@ jobs:
   workflow-summary:
     name: Workflow Summary
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     needs: [lint, format-check, unit-tests, integration-tests, coverage, security-scan]
     if: always()  # Run even if some jobs fail
     steps:
