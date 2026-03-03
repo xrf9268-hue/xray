@@ -200,7 +200,7 @@ jobs:
   coverage:
     name: Real Shell Coverage (kcov)
     runs-on: ubuntu-22.04
-    timeout-minutes: 20
+    timeout-minutes: 30
     needs: [unit-tests]
     outputs:
       unit_percent: ${{ steps.unit-coverage.outputs.unit_percent }}
@@ -213,7 +213,9 @@ jobs:
 
       - name: Install coverage dependencies
         run: |
-          bash scripts/ci/apt-resilient.sh ca-certificates curl tar python3 jq libbinutils libdw1 libelf1
+          bash scripts/ci/apt-resilient.sh ca-certificates curl tar python3 jq \
+            cmake g++ pkg-config libdw-dev libelf-dev libiberty-dev \
+            libcurl4-openssl-dev zlib1g-dev binutils-dev
 
       - name: Install bats-core
         run: |
@@ -224,32 +226,64 @@ jobs:
           rm -rf "${tmpdir}"
           bats -v
 
-      - name: Install kcov (pinned release)
+      - name: Cache kcov binary
+        id: cache-kcov
+        # actions/cache@v5.0.3 (pinned to commit SHA for security)
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
+        with:
+          path: /usr/local/bin/kcov
+          key: kcov-v42-built-${{ runner.os }}-${{ runner.arch }}
+
+      - name: Build kcov from source
+        if: steps.cache-kcov.outputs.cache-hit != 'true'
         run: |
           KCOV_VERSION="v42"
-          KCOV_SHA256="78aa17a5f6d27a867cc0540b1550051591d350423a1a0ef98d63c9ce7cc10f9d"
           tmpdir="$(mktemp -d)"
-          archive="${tmpdir}/kcov-amd64.tar.gz"
-          curl -fsSL "https://github.com/SimonKagstrom/kcov/releases/download/${KCOV_VERSION}/kcov-amd64.tar.gz" -o "${archive}"
-          echo "${KCOV_SHA256}  ${archive}" | sha256sum -c -
-          tar -xzf "${archive}" -C "${tmpdir}"
-          sudo install -m 0755 "${tmpdir}/usr/local/bin/kcov" /usr/local/bin/kcov
+          curl -fsSL "https://github.com/SimonKagstrom/kcov/archive/refs/tags/${KCOV_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
+          cd "${tmpdir}/kcov-${KCOV_VERSION#v}"
+          mkdir build && cd build
+          cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
+          make -j"$(nproc)"
+          sudo make install
           rm -rf "${tmpdir}"
+
+      - name: Verify kcov
+        run: |
           kcov --version
+          ldd "$(command -v kcov)" | grep -c "not found" && { echo "Missing shared libraries"; exit 1; } || true
 
       - name: Collect unit coverage
         id: unit-coverage
         run: |
           mkdir -p artifacts/coverage/unit
-          kcov --bash-method=DEBUG --exclude-path=/tmp --include-path="${GITHUB_WORKSPACE}" \
+          kcov --bash-dont-parse-binary-dir \
+            --include-path="${GITHUB_WORKSPACE}/lib,${GITHUB_WORKSPACE}/commands,${GITHUB_WORKSPACE}/modules,${GITHUB_WORKSPACE}/services,${GITHUB_WORKSPACE}/plugins,${GITHUB_WORKSPACE}/bin" \
+            --exclude-path=/tmp \
             artifacts/coverage/unit \
             bats tests/unit/*.bats
 
-          json_file="$(find artifacts/coverage/unit -name coverage.json | head -n1)"
+          # Debug: list tracked files
+          echo "--- kcov tracked files ---"
+          find artifacts/coverage/unit -name "*.json" -path "*/kcov-merged/*" | head -5
+          json_file="$(find artifacts/coverage/unit -name coverage.json -path "*/kcov-merged/*" | head -n1)"
+          if [[ -z "${json_file}" ]]; then
+            # Fallback: any coverage.json
+            json_file="$(find artifacts/coverage/unit -name coverage.json | head -n1)"
+          fi
           if [[ -z "${json_file}" ]]; then
             echo "coverage.json not found in artifacts/coverage/unit" >&2
+            find artifacts/coverage/unit -type f | head -20
             exit 1
           fi
+          echo "Using: ${json_file}"
+          python3 -c '
+          import json, sys
+          with open(sys.argv[1], encoding="utf-8") as f:
+              data = json.load(f)
+          print("Files tracked:", len(data.get("files", [])))
+          for f in data.get("files", [])[:5]:
+              print(f"  {f.get(\"filename\",\"?\")}: {f.get(\"percent_covered\",\"?\")}%")
+          ' "${json_file}"
 
           unit_percent="$(python3 -c '
           import json, sys
@@ -279,7 +313,9 @@ jobs:
         continue-on-error: true
         run: |
           mkdir -p artifacts/coverage/integration
-          kcov --bash-method=DEBUG --exclude-path=/tmp --include-path="${GITHUB_WORKSPACE}" \
+          kcov --bash-dont-parse-binary-dir \
+            --include-path="${GITHUB_WORKSPACE}/lib,${GITHUB_WORKSPACE}/commands,${GITHUB_WORKSPACE}/modules,${GITHUB_WORKSPACE}/services,${GITHUB_WORKSPACE}/plugins,${GITHUB_WORKSPACE}/bin" \
+            --exclude-path=/tmp \
             artifacts/coverage/integration \
             bats tests/integration/*.bats
 
