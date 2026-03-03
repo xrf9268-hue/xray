@@ -41,7 +41,7 @@ fi
 cleanup_tmp_lists() {
   local f
   for f in "${tmp_lists[@]}"; do
-    rm -f "${f}" 2>/dev/null || true
+    rm -f "${f}" 2> /dev/null || true
   done
 }
 
@@ -55,7 +55,7 @@ trim_spaces() {
 write_ubuntu_sources() {
   local dst="${1}"
   local base="${2}"
-  cat > "${dst}" <<EOF
+  cat > "${dst}" << EOF
 deb ${base} ${codename} main restricted universe multiverse
 deb ${base} ${codename}-updates main restricted universe multiverse
 deb ${base} ${codename}-backports main restricted universe multiverse
