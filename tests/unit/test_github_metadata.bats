@@ -44,7 +44,7 @@ workflow_has_job_timeout() {
     "format-check:5" \
     "unit-tests:15" \
     "integration-tests:20" \
-    "coverage:20" \
+    "coverage:30" \
     "security-scan:5" \
     "workflow-summary:5"; do
     IFS=':' read -r job timeout <<< "${spec}"
