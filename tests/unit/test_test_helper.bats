@@ -24,3 +24,14 @@ load ../test_helper
     unset BATS_TEST_TMPDIR || true
   fi
 }
+
+@test "test_helper defines bats_require_minimum_version compatibility shim when missing" {
+  run bash -c '
+    set -euo pipefail
+    unset -f bats_require_minimum_version 2>/dev/null || true
+    # shellcheck source=tests/test_helper.bash
+    . "'"${PROJECT_ROOT}"'/tests/test_helper.bash"
+    declare -F bats_require_minimum_version >/dev/null
+  '
+  [ "$status" -eq 0 ]
+}

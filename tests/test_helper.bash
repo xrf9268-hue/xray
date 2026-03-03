@@ -20,6 +20,13 @@ source "${PROJECT_ROOT}/lib/core.sh"
 source "${PROJECT_ROOT}/lib/args.sh"
 source "${PROJECT_ROOT}/lib/plugins.sh"
 
+# Compatibility: older bats-core versions do not ship bats_require_minimum_version.
+if ! declare -F bats_require_minimum_version > /dev/null 2>&1; then
+  bats_require_minimum_version() {
+    return 0
+  }
+fi
+
 # Test fixtures directory
 FIXTURES="${PROJECT_ROOT}/tests/fixtures"
 export FIXTURES
