@@ -42,9 +42,8 @@ jobs:
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
-          path: |
-            /var/cache/apt/archives
-            /var/lib/apt/lists
+          # Cache only .deb payloads; avoid root-owned lock/partial entries.
+          path: /var/cache/apt/archives/*.deb
           key: apt-shellcheck-${{ runner.os }}-${{ hashFiles('.github/workflows/test.yml') }}
           restore-keys: |
             apt-shellcheck-${{ runner.os }}-
@@ -110,9 +109,8 @@ jobs:
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
-          path: |
-            /var/cache/apt/archives
-            /var/lib/apt/lists
+          # Cache only .deb payloads; avoid root-owned lock/partial entries.
+          path: /var/cache/apt/archives/*.deb
           key: apt-bats-${{ runner.os }}-${{ matrix.ubuntu-version }}-${{ hashFiles('.github/workflows/test.yml') }}
           restore-keys: |
             apt-bats-${{ runner.os }}-${{ matrix.ubuntu-version }}-
@@ -129,7 +127,12 @@ jobs:
           bats -v
 
       - name: Run unit tests
-        run: make test-unit
+        run: |
+          mkdir -p artifacts/unit
+          bats --print-output-on-failure \
+            --report-formatter junit \
+            --output artifacts/unit \
+            tests/unit/*.bats
 
       - name: Upload test results
         if: always()
@@ -137,9 +140,7 @@ jobs:
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: test-results-${{ matrix.ubuntu-version }}
-          path: |
-            tests/**/*.bats
-            tests/**/*.log
+          path: artifacts/unit/*.xml
           retention-days: 3  # OPTIMIZED: 7 → 3 days (sufficient for debugging)
 
   integration-tests:
@@ -157,9 +158,8 @@ jobs:
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
-          path: |
-            /var/cache/apt/archives
-            /var/lib/apt/lists
+          # Cache only .deb payloads; avoid root-owned lock/partial entries.
+          path: /var/cache/apt/archives/*.deb
           key: apt-integration-${{ runner.os }}-${{ hashFiles('.github/workflows/test.yml') }}
           restore-keys: |
             apt-integration-${{ runner.os }}-
@@ -176,9 +176,12 @@ jobs:
           bats -v
 
       - name: Run integration tests
-        # Continue on error since some tests are marked as skip
-        continue-on-error: true
-        run: make test-integration
+        run: |
+          mkdir -p artifacts/integration
+          bats --print-output-on-failure \
+            --report-formatter junit \
+            --output artifacts/integration \
+            tests/integration/*.bats
 
       - name: Upload integration test results
         if: always()
@@ -186,9 +189,7 @@ jobs:
         uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: integration-test-results
-          path: |
-            tests/integration/**/*.tap
-            tests/integration/**/*.log
+          path: artifacts/integration/*.xml
           retention-days: 3
 
   coverage:
