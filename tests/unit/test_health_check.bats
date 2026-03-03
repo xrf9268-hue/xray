@@ -154,6 +154,31 @@ setup() {
   [ "$status" -eq 1 ]
 }
 
+@test "health::check_certificates - uses cert_dir from state when provided" {
+  local cert_dir="${BATS_TEST_TMPDIR}/certs-custom"
+  mkdir -p "${cert_dir}"
+  touch "${cert_dir}/fullchain.pem" "${cert_dir}/privkey.pem"
+
+  state::load() {
+    printf '{"name":"vision-reality","xray":{"domain":"example.com","cert_dir":"%s"}}\n' "${cert_dir}"
+  }
+
+  openssl() {
+    if [[ "${1:-}" == "x509" ]]; then
+      local arg
+      for arg in "$@"; do
+        if [[ "${arg}" == "-checkend" ]]; then
+          return 0
+        fi
+      done
+    fi
+    command openssl "$@"
+  }
+
+  run health::check_certificates
+  [ "$status" -eq 0 ]
+}
+
 # ============================================================================
 # health::run() Tests - Text Format
 # ============================================================================

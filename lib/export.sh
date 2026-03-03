@@ -97,7 +97,7 @@ export::uri() {
     return 1
   fi
 
-  local line label link
+  local label link
   while IFS=$'\t' read -r label link _rest; do
     [[ -n "${label}" && -n "${link}" ]] || continue
     if [[ "${label}" == "VISION" ]]; then
@@ -124,7 +124,7 @@ export::uri_raw() {
     return 1
   fi
 
-  local line link
+  local link
   while IFS=$'\t' read -r _label link _rest; do
     [[ -n "${link}" ]] || continue
     printf '%s\n' "${link}"

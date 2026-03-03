@@ -115,19 +115,17 @@ teardown() {
   [ -f "${target}" ]  # Target should still exist
 }
 
-@test "_rm - returns non-zero for non-existent path" {
-  # The _rm function uses && which returns 1 when condition is false
-  # This is expected behavior - callers use || true to ignore
+@test "_rm - returns zero for non-existent path" {
   _rm() {
     local p="${1}"
-    [[ -e "${p}" || -L "${p}" ]] && {
-      echo "rm -rf ${p}"
-      rm -rf "${p}" || true
-    }
+    [[ -e "${p}" || -L "${p}" ]] || return 0
+    echo "rm -rf ${p}"
+    rm -rf "${p}" || true
+    return 0
   }
 
   run _rm "${TEST_TMPDIR}/nonexistent"
-  [ "$status" -eq 1 ]
+  [ "$status" -eq 0 ]
   [ -z "$output" ]
 }
 

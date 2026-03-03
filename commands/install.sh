@@ -140,7 +140,9 @@ main() {
   # Auto-backup before installation (if existing installation found)
   local state_file
   state_file="$(state::path)"
-  if [[ -f "${state_file}" ]]; then
+  local existing_confdir
+  existing_confdir="$(xray::confbase)"
+  if [[ -f "${state_file}" && -d "${existing_confdir}" ]]; then
     core::log info "existing installation detected, creating automatic backup" "{}"
     local auto_backup_name
     auto_backup_name="pre-install-$(date +%Y%m%d-%H%M%S)"
@@ -150,6 +152,8 @@ main() {
       core::log warn "failed to create automatic backup" '{"suggestion":"continuing with installation"}'
       # Continue anyway - user confirmed installation
     fi
+  elif [[ -f "${state_file}" ]]; then
+    core::log info "state file exists but config directory is missing; skipping automatic backup" "$(printf '{"state":"%s","confdir":"%s"}' "${state_file}" "${existing_confdir}")"
   fi
 
   plugins::emit install_pre "topology=${TOPOLOGY}" "version=${VERSION}"
@@ -324,10 +328,11 @@ main() {
       --arg vport "${XRAY_VISION_PORT}" --arg rport "${XRAY_REALITY_PORT}" \
       --arg vuuid "${XRAY_UUID_VISION}" --arg ruuid "${XRAY_UUID_REALITY}" \
       --arg domain "${XRAY_DOMAIN}" --arg sni "${XRAY_SNI}" --arg sid "${XRAY_SHORT_ID:-}" --arg pbk "${XRAY_PUBLIC_KEY:-}" \
+      --arg cert_dir "${XRAY_CERT_DIR}" \
       --arg fp "${XRAY_FINGERPRINT:-chrome}" \
       --arg vdec "${XRAY_VLESS_DECRYPTION:-}" --arg venc "${XRAY_VLESS_ENCRYPTION:-}" \
       '
-      {name:$name,version:$ver,installed_at:$ts,xray:{vision_port:($vport|tonumber),reality_port:($rport|tonumber),uuid_vision:$vuuid,uuid_reality:$ruuid,domain:$domain,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk,fingerprint:$fp}}
+      {name:$name,version:$ver,installed_at:$ts,xray:{vision_port:($vport|tonumber),reality_port:($rport|tonumber),uuid_vision:$vuuid,uuid_reality:$ruuid,domain:$domain,reality_sni:$sni,short_id:$sid,reality_public_key:$pbk,cert_dir:$cert_dir,fingerprint:$fp}}
       | if $vdec != "" and $vdec != "none" then .xray.vless_decryption = $vdec else . end
       | if $venc != "" and $venc != "none" then .xray.vless_encryption = $venc else . end
       ')
