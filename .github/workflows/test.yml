@@ -34,13 +34,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        # actions/checkout@v4.3.0 (pinned to commit SHA for security)
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        # actions/checkout@v6.0.2 (pinned to commit SHA for security)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Cache apt packages
         id: cache-apt
-        # actions/cache@v4.2.0 (pinned to commit SHA for security)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57
+        # actions/cache@v5.0.3 (pinned to commit SHA for security)
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
           path: |
             /var/cache/apt/archives
@@ -62,13 +62,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        # actions/checkout@v4.3.0 (pinned to commit SHA for security)
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        # actions/checkout@v6.0.2 (pinned to commit SHA for security)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Cache shfmt binary
         id: cache-shfmt
-        # actions/cache@v4.2.0 (pinned to commit SHA for security)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57
+        # actions/cache@v5.0.3 (pinned to commit SHA for security)
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
           path: ~/.local/bin/shfmt
           key: shfmt-v3.12.0-${{ runner.os }}
@@ -83,30 +83,32 @@ jobs:
           chmod +x ~/.local/bin/shfmt
 
       - name: Add shfmt to PATH
-        run: echo "$HOME/.local/bin" >> $GITHUB_PATH
+        run: echo "$HOME/.local/bin" >> "$GITHUB_PATH"
 
       - name: Check formatting
         run: |
-          shfmt -i 2 -ci -sr -bn -ln=bash -d $(git ls-files '*.sh' 'bin/*' 'commands/*' 'lib/*' 'modules/**/*' 'services/**/*' 'plugins/**/*.sh' 'scripts/**/*.sh' 2>/dev/null)
+          mapfile -t files < <(git ls-files '*.sh' 'bin/*' 'commands/*' 'lib/*' 'modules/**/*' 'services/**/*' 'plugins/**/*.sh' 'scripts/**/*.sh' 2>/dev/null)
+          if ((${#files[@]} > 0)); then
+            shfmt -i 2 -ci -sr -bn -ln=bash -d "${files[@]}"
+          fi
 
   unit-tests:
     name: Unit Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-${{ matrix.ubuntu-version }}
     strategy:
       matrix:
-        # OPTIMIZED: Test only LTS versions (20.04, 24.04)
-        # Rationale: Bash scripts have high cross-version compatibility
-        # Saves 33% CI time while maintaining adequate coverage
-        ubuntu-version: ['20.04', '24.04']
+        # OPTIMIZED: Test on currently supported LTS runners
+        # Rationale: ubuntu-20.04 is no longer listed for GitHub-hosted runners
+        ubuntu-version: ['22.04', '24.04']
     steps:
       - name: Checkout code
-        # actions/checkout@v4.3.0 (pinned to commit SHA for security)
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        # actions/checkout@v6.0.2 (pinned to commit SHA for security)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Cache apt packages
         id: cache-apt-bats
-        # actions/cache@v4.2.0 (pinned to commit SHA for security)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57
+        # actions/cache@v5.0.3 (pinned to commit SHA for security)
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
           path: |
             /var/cache/apt/archives
@@ -125,8 +127,8 @@ jobs:
 
       - name: Upload test results
         if: always()
-        # actions/upload-artifact@v4.5.0 (pinned to commit SHA for security)
-        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b
+        # actions/upload-artifact@v7.0.0 (pinned to commit SHA for security)
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: test-results-${{ matrix.ubuntu-version }}
           path: |
@@ -141,13 +143,13 @@ jobs:
     # Rationale: 13/21 (62%) tests are runnable, providing valuable feedback
     steps:
       - name: Checkout code
-        # actions/checkout@v4.3.0 (pinned to commit SHA for security)
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        # actions/checkout@v6.0.2 (pinned to commit SHA for security)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Cache apt packages
         id: cache-apt-integration
-        # actions/cache@v4.2.0 (pinned to commit SHA for security)
-        uses: actions/cache@1bd1e32a3bdc45362d1e726936510720a7c30a57
+        # actions/cache@v5.0.3 (pinned to commit SHA for security)
+        uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
           path: |
             /var/cache/apt/archives
@@ -168,8 +170,8 @@ jobs:
 
       - name: Upload integration test results
         if: always()
-        # actions/upload-artifact@v4.5.0 (pinned to commit SHA for security)
-        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b
+        # actions/upload-artifact@v7.0.0 (pinned to commit SHA for security)
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: integration-test-results
           path: |
@@ -185,8 +187,8 @@ jobs:
     # Rationale: Developers should see coverage info during development
     steps:
       - name: Checkout code
-        # actions/checkout@v4.3.0 (pinned to commit SHA for security)
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        # actions/checkout@v6.0.2 (pinned to commit SHA for security)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Display coverage summary
         run: |
@@ -212,12 +214,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        # actions/checkout@v4.3.0 (pinned to commit SHA for security)
-        uses: actions/checkout@08eba0b27e820071cde6df949e0beb9ba4906955
+        # actions/checkout@v6.0.2 (pinned to commit SHA for security)
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
       - name: Run ShellCheck security checks
         run: |
-          shellcheck -S error -f json $(git ls-files '*.sh' 'bin/*' 'commands/*' 'lib/*' 'modules/**/*' 'services/**/*' 'plugins/**/*.sh' 'scripts/**/*.sh' 2>/dev/null) > shellcheck-report.json || true
+          mapfile -t files < <(git ls-files '*.sh' 'bin/*' 'commands/*' 'lib/*' 'modules/**/*' 'services/**/*' 'plugins/**/*.sh' 'scripts/**/*.sh' 2>/dev/null)
+          if ((${#files[@]} > 0)); then
+            shellcheck -S error -f json "${files[@]}" > shellcheck-report.json || true
+          else
+            printf '[]\n' > shellcheck-report.json
+          fi
 
       - name: Check for hardcoded secrets
         run: |
@@ -230,8 +237,8 @@ jobs:
 
       - name: Upload security report
         if: always()
-        # actions/upload-artifact@v4.5.0 (pinned to commit SHA for security)
-        uses: actions/upload-artifact@6f51ac03b9356f520e9adb1b1b7802705f340c2b
+        # actions/upload-artifact@v7.0.0 (pinned to commit SHA for security)
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
         with:
           name: security-report
           path: shellcheck-report.json
@@ -245,22 +252,24 @@ jobs:
     steps:
       - name: Generate workflow summary
         run: |
-          echo "## 🎯 CI/CD Workflow Execution Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "| Job | Status | Notes |" >> $GITHUB_STEP_SUMMARY
-          echo "|-----|--------|-------|" >> $GITHUB_STEP_SUMMARY
-          echo "| Lint (ShellCheck) | ${{ needs.lint.result }} | Static analysis |" >> $GITHUB_STEP_SUMMARY
-          echo "| Format Check (shfmt) | ${{ needs.format-check.result }} | Code formatting |" >> $GITHUB_STEP_SUMMARY
-          echo "| Unit Tests | ${{ needs.unit-tests.result }} | 108 tests across 2 Ubuntu versions |" >> $GITHUB_STEP_SUMMARY
-          echo "| Integration Tests | ${{ needs.integration-tests.result }} | 13/21 runnable tests |" >> $GITHUB_STEP_SUMMARY
-          echo "| Coverage Summary | ${{ needs.coverage.result }} | ~85% overall coverage |" >> $GITHUB_STEP_SUMMARY
-          echo "| Security Scan | ${{ needs.security-scan.result }} | ShellCheck + secret detection |" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "### 📊 Workflow Details" >> $GITHUB_STEP_SUMMARY
-          echo "- **Trigger**: ${{ github.event_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Branch**: ${{ github.ref_name }}" >> $GITHUB_STEP_SUMMARY
-          echo "- **Commit**: [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})" >> $GITHUB_STEP_SUMMARY
-          echo "- **Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "---" >> $GITHUB_STEP_SUMMARY
-          echo "*Optimized with Phase 1-4 improvements: caching, concurrency control, path filtering*" >> $GITHUB_STEP_SUMMARY
+          {
+            echo "## 🎯 CI/CD Workflow Execution Summary"
+            echo ""
+            echo "| Job | Status | Notes |"
+            echo "|-----|--------|-------|"
+            echo "| Lint (ShellCheck) | ${{ needs.lint.result }} | Static analysis |"
+            echo "| Format Check (shfmt) | ${{ needs.format-check.result }} | Code formatting |"
+            echo "| Unit Tests | ${{ needs.unit-tests.result }} | 108 tests across 2 Ubuntu versions |"
+            echo "| Integration Tests | ${{ needs.integration-tests.result }} | 13/21 runnable tests |"
+            echo "| Coverage Summary | ${{ needs.coverage.result }} | ~85% overall coverage |"
+            echo "| Security Scan | ${{ needs.security-scan.result }} | ShellCheck + secret detection |"
+            echo ""
+            echo "### 📊 Workflow Details"
+            echo "- **Trigger**: ${{ github.event_name }}"
+            echo "- **Branch**: ${{ github.ref_name }}"
+            echo "- **Commit**: [\`${{ github.sha }}\`](${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }})"
+            echo "- **Run**: [#${{ github.run_number }}](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            echo ""
+            echo "---"
+            echo "*Optimized with Phase 1-4 improvements: caching, concurrency control, path filtering*"
+          } >> "$GITHUB_STEP_SUMMARY"
