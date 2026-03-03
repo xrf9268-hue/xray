@@ -285,13 +285,15 @@ jobs:
           echo "Using: ${json_file}"
           python3 -c '
           import json, sys
-          with open(sys.argv[1], encoding="utf-8") as f:
-              data = json.load(f)
+          with open(sys.argv[1], encoding="utf-8") as fh:
+              data = json.load(fh)
           print("Total percent_covered:", data.get("percent_covered", "N/A"))
           files = data.get("files", [])
           print("Files tracked:", len(files))
-          for f in files[:10]:
-              print(f"  {f.get(\"filename\",\"?\")}: {f.get(\"percent_covered\",\"?\")}%")
+          for entry in files[:10]:
+              name = entry.get("filename", "?")
+              pct = entry.get("percent_covered", "?")
+              print("  %s: %s%%" % (name, pct))
           ' "${json_file}"
 
           unit_percent="$(python3 -c '
