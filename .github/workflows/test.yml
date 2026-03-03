@@ -251,15 +251,12 @@ jobs:
             exit 1
           fi
 
-          unit_percent="$(
-            python3 - "${json_file}" <<'PY'
-import json
-import sys
-with open(sys.argv[1], encoding="utf-8") as f:
-    data = json.load(f)
-print(f"{float(data['percent_covered']):.2f}")
-PY
-          )"
+          unit_percent="$(python3 -c '
+          import json, sys
+          with open(sys.argv[1], encoding="utf-8") as f:
+              data = json.load(f)
+          print("{:.2f}".format(float(data["percent_covered"])))
+          ' "${json_file}")"
           unit_threshold="$(tr -d '[:space:]' < .github/coverage/unit-threshold.txt)"
 
           echo "unit_percent=${unit_percent}" >> "${GITHUB_OUTPUT}"
@@ -267,15 +264,15 @@ PY
 
       - name: Enforce unit coverage threshold
         run: |
-          python3 - "${{ steps.unit-coverage.outputs.unit_percent }}" "${{ steps.unit-coverage.outputs.unit_threshold }}" <<'PY'
-import sys
-actual = float(sys.argv[1])
-threshold = float(sys.argv[2])
-if actual < threshold:
-    print(f"Unit coverage gate failed: {actual:.2f}% < {threshold:.2f}%")
-    raise SystemExit(1)
-print(f"Unit coverage gate passed: {actual:.2f}% >= {threshold:.2f}%")
-PY
+          python3 -c '
+          import sys
+          actual = float(sys.argv[1])
+          threshold = float(sys.argv[2])
+          if actual < threshold:
+              print("Unit coverage gate failed: {:.2f}% < {:.2f}%".format(actual, threshold))
+              raise SystemExit(1)
+          print("Unit coverage gate passed: {:.2f}% >= {:.2f}%".format(actual, threshold))
+          ' "${{ steps.unit-coverage.outputs.unit_percent }}" "${{ steps.unit-coverage.outputs.unit_threshold }}"
 
       - name: Collect integration coverage (non-gating)
         id: integration-coverage-run
