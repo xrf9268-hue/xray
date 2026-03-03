@@ -6,6 +6,22 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 . "${HERE}/modules/user/user.sh"
 . "${HERE}/lib/plugins.sh"
 . "${HERE}/modules/state.sh"
+# shellcheck source=services/xray/common.sh
+. "${HERE}/services/xray/common.sh"
+
+systemd::render_xray_unit() {
+  local xray_bin confbase active_confdir
+  xray_bin="$(xray::bin)"
+  confbase="$(xray::confbase)"
+  active_confdir="$(xray::active)"
+
+  sed \
+    -e "s|/usr/local/bin/xray|${xray_bin}|g" \
+    -e "s|/usr/local/etc/xray/active|${active_confdir}|g" \
+    -e "s|/usr/local/etc/xray|${confbase}|g" \
+    "${HERE}/packaging/systemd/xray.service"
+}
+
 unit_path() { systemd_unit_path; }
 install_unit() {
   core::init "${@}"
@@ -23,7 +39,7 @@ install_unit_with_lock() {
   core::log info "preparing systemd unit directory" "$(printf '{"dir":"%s"}' "$(dirname "${unit_file}")")"
   io::ensure_dir "$(dirname "${unit_file}")" 0755
   core::log info "writing systemd unit file" "$(printf '{"path":"%s"}' "${unit_file}")"
-  if ! io::atomic_write "${unit_file}" 0644 < "${HERE}/packaging/systemd/xray.service"; then
+  if ! systemd::render_xray_unit | io::atomic_write "${unit_file}" 0644; then
     core::log error "failed to write systemd unit" "$(printf '{"path":"%s"}' "${unit_file}")"
     return 1
   fi

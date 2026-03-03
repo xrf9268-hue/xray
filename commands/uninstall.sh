@@ -7,10 +7,13 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 
 _rm() {
   local p="${1}"
-  [[ -e "${p}" || -L "${p}" ]] && {
-    core::log debug "removing" "$(printf '{"path":"%s"}' "$(core::json_escape "${p}")")"
-    rm -rf "${p}" || true
-  }
+  if [[ ! -e "${p}" && ! -L "${p}" ]]; then
+    return 0
+  fi
+
+  core::log debug "removing" "$(printf '{"path":"%s"}' "$(core::json_escape "${p}")")"
+  rm -rf "${p}" || true
+  return 0
 }
 
 uninstall_caddy() {

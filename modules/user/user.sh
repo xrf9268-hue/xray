@@ -7,6 +7,17 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 . "${HERE}/lib/core.sh"
 
 ##
+# Run privileged command using direct execution as root, sudo otherwise.
+##
+user::_run_privileged() {
+  if [[ "$(id -u)" -eq 0 ]]; then
+    "$@"
+  else
+    core::sudo_cmd "$@"
+  fi
+}
+
+##
 # Ensure a system user and group exist with expected ownership
 #
 # Creates a system group/user pair when missing and validates existing
@@ -26,7 +37,7 @@ user::ensure_system_user() {
 
   if ! group_entry="$(getent group "${g}")"; then
     core::log info "creating system group" "$(printf '{"group":"%s"}' "${g}")"
-    if ! sudo groupadd --system "${g}"; then
+    if ! user::_run_privileged groupadd --system "${g}"; then
       core::log error "failed to create system group" "$(printf '{"group":"%s","hint":"ensure permission to create groups or create manually"}' "${g}")"
       return 1
     fi
@@ -55,7 +66,7 @@ user::ensure_system_user() {
   fi
 
   core::log info "creating system user" "$(printf '{"user":"%s","group":"%s"}' "${u}" "${g}")"
-  if ! sudo useradd --system --gid "${g}" --home-dir "/var/lib/${u}" --no-create-home --shell /usr/sbin/nologin "${u}"; then
+  if ! user::_run_privileged useradd --system --gid "${g}" --home-dir "/var/lib/${u}" --no-create-home --shell /usr/sbin/nologin "${u}"; then
     core::log error "failed to create system user" "$(printf '{"user":"%s","group":"%s","hint":"create user manually with system flags and expected group"}' "${u}" "${g}")"
     return 1
   fi

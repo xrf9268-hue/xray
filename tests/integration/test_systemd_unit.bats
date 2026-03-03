@@ -29,6 +29,14 @@ EOF
 
   cat > "${TEST_ROOT}/bin/getent" <<'EOF'
 #!/usr/bin/env bash
+if [[ "${1:-}" == "group" && "${2:-}" == "xray" ]]; then
+  echo "xray:x:998:"
+  exit 0
+fi
+if [[ "${1:-}" == "passwd" && "${2:-}" == "xray" ]]; then
+  echo "xray:x:999:998::/var/lib/xray:/usr/sbin/nologin"
+  exit 0
+fi
 exit 1
 EOF
   chmod +x "${TEST_ROOT}/bin/getent"
@@ -51,4 +59,40 @@ teardown() {
   grep -q "systemctl enable --now xray" "${XRF_VAR}/systemctl.log"
   grep -q "systemctl disable --now xray" "${XRF_VAR}/systemctl.log"
   grep -q "systemctl reset-failed xray.service" "${XRF_VAR}/systemctl.log"
+}
+
+@test "install_unit renders unit paths from XRF_PREFIX and XRF_ETC" {
+  export XRF_SYSTEMD_DIR="${XRF_ETC}/systemd/system"
+  export XRF_PREFIX="${TEST_ROOT}/prefix-custom"
+  export XRF_ETC="${TEST_ROOT}/etc-custom"
+  mkdir -p "${XRF_PREFIX}/bin" "${XRF_ETC}/xray/active" "${XRF_SYSTEMD_DIR}"
+
+  cat > "${TEST_ROOT}/bin/systemctl" <<'EOF'
+#!/usr/bin/env bash
+echo "systemctl $*" >> "${XRF_VAR}/systemctl.log"
+exit 0
+EOF
+  chmod +x "${TEST_ROOT}/bin/systemctl"
+
+  # Simulate existing xray group/user so install can proceed without useradd.
+  cat > "${TEST_ROOT}/bin/getent" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "group" && "${2:-}" == "xray" ]]; then
+  echo "xray:x:998:"
+  exit 0
+fi
+if [[ "${1:-}" == "passwd" && "${2:-}" == "xray" ]]; then
+  echo "xray:x:999:998::/var/lib/xray:/usr/sbin/nologin"
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "${TEST_ROOT}/bin/getent"
+
+  run "${PROJECT_ROOT}/services/xray/systemd-unit.sh" install
+
+  [ "$status" -eq 0 ]
+  [ -f "${XRF_SYSTEMD_DIR}/xray.service" ]
+  grep -q "ExecStart=${XRF_PREFIX}/bin/xray run -confdir ${XRF_ETC}/xray/active -format json" "${XRF_SYSTEMD_DIR}/xray.service"
+  grep -q "ReadWritePaths=${XRF_ETC}/xray" "${XRF_SYSTEMD_DIR}/xray.service"
 }

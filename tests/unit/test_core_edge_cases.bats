@@ -374,6 +374,25 @@ teardown() {
   [[ "$output" == "hello world" ]]
 }
 
+@test "core::with_flock - times out when lock is already held" {
+  command -v flock > /dev/null 2>&1 || skip "flock not available"
+
+  local lock_file="${TEST_TMPDIR}/busy.lock"
+  bash -c "exec 200>>'${lock_file}'; flock 200; sleep 3" &
+  local holder_pid=$!
+  sleep 0.2
+
+  SECONDS=0
+  XRF_FLOCK_TIMEOUT_SEC=1 run core::with_flock "${lock_file}" true
+  local elapsed="${SECONDS}"
+
+  kill "${holder_pid}" 2> /dev/null || true
+  wait "${holder_pid}" 2> /dev/null || true
+
+  [ "${status}" -ne 0 ]
+  [ "${elapsed}" -lt 3 ]
+}
+
 # =============================================================================
 # core::ts edge cases
 # =============================================================================

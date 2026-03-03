@@ -21,6 +21,15 @@ create_user_mocks() {
 "$@"
 EOF
 
+  cat > "${TEST_TMPDIR}/bin/id" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-u" ]]; then
+  echo "${MOCK_ID_U:-1000}"
+  exit 0
+fi
+/usr/bin/id "$@"
+EOF
+
   cat > "${TEST_TMPDIR}/bin/getent" <<'EOF'
 #!/usr/bin/env bash
 record="${TEST_TMPDIR}/${1}_${2}"
@@ -67,7 +76,7 @@ fi
 printf "%s:x:1000:%s::/var/lib/%s:/usr/sbin/nologin\n" "${user}" "${gid}" "${user}" > "${TEST_TMPDIR}/passwd_${user}"
 EOF
 
-  chmod +x "${TEST_TMPDIR}/bin/"{sudo,getent,groupadd,useradd}
+  chmod +x "${TEST_TMPDIR}/bin/"{sudo,id,getent,groupadd,useradd}
 }
 
 mock_path() {
@@ -305,4 +314,22 @@ EOF
   [ "${status}" -eq 0 ]
   # Verify sudo was used for useradd
   grep -q "sudo: useradd" "${TEST_TMPDIR}/sudo_calls"
+}
+
+@test "runs without sudo when effective user is root" {
+  rm -f "${TEST_TMPDIR}/group_nosudo" "${TEST_TMPDIR}/passwd_nosudo" "${TEST_TMPDIR}/sudo_calls"
+
+  # If sudo is called in root mode this test must fail.
+  cat > "${TEST_TMPDIR}/bin/sudo" <<'EOF'
+#!/usr/bin/env bash
+echo "sudo: $@" >> "${TEST_TMPDIR}/sudo_calls"
+exit 99
+EOF
+  chmod +x "${TEST_TMPDIR}/bin/sudo"
+
+  PATH="$(mock_path)" MOCK_ID_U=0 run user::ensure_system_user nosudo nosudo
+  [ "${status}" -eq 0 ]
+  assert_file_exists "${TEST_TMPDIR}/group_nosudo"
+  assert_file_exists "${TEST_TMPDIR}/passwd_nosudo"
+  [ ! -f "${TEST_TMPDIR}/sudo_calls" ]
 }

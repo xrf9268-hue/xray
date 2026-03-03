@@ -31,11 +31,13 @@ teardown() {
 @test "install flow - vision-reality requires domain" {
   run bin/xrf install --topology vision-reality
   [ "$status" -ne 0 ]
-  [[ "$output" == *"requires domain"* ]]
+  [[ "$output" == *"Missing required parameter"* ]]
+  [[ "$output" == *"--domain"* ]]
 }
 
 @test "install flow - invalid topology rejected" {
   run bin/xrf install --topology invalid-topo
   [ "$status" -ne 0 ]
-  [[ "$output" == *"invalid topology"* ]]
+  [[ "$output" == *"Invalid topology"* ]]
+  [[ "$output" == *"invalid-topo"* ]]
 }

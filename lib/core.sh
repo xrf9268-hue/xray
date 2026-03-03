@@ -648,10 +648,16 @@ core::with_flock() {
     return 1
   }
 
+  local lock_timeout="${XRF_FLOCK_TIMEOUT_SEC:-30}"
+  [[ "${lock_timeout}" =~ ^[0-9]+$ && "${lock_timeout}" -ge 1 ]] || lock_timeout=30
+
   if command -v flock > /dev/null 2>&1; then
     (
-      exec 200>> "${lock}"
-      flock 200
+      exec 200>"${lock}"
+      if ! flock -w "${lock_timeout}" -x 200; then
+        core::log error "timed out waiting for lock" "$(printf '{"lock":"%s","timeout_sec":%d}' "$(core::json_escape "${lock}")" "${lock_timeout}")"
+        exit 1
+      fi
       "${@}"
     )
     return $?
@@ -660,7 +666,12 @@ core::with_flock() {
   # macOS and some minimal environments do not provide flock(1).
   # Fall back to directory lock with polling to preserve mutual exclusion.
   local lock_dir="${lock}.d"
+  local lock_started="${SECONDS}"
   while ! mkdir "${lock_dir}" 2> /dev/null; do
+    if ((SECONDS - lock_started >= lock_timeout)); then
+      core::log error "timed out waiting for lock" "$(printf '{"lock":"%s","timeout_sec":%d}' "$(core::json_escape "${lock}")" "${lock_timeout}")"
+      return 1
+    fi
     sleep 0.1
   done
 

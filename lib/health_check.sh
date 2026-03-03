@@ -258,8 +258,9 @@ health::check_certificates() {
   # Extract domain and cert dir
   local domain cert_dir
   domain="$(echo "${state}" | jq -r '.xray.domain // ""')"
+  cert_dir="$(echo "${state}" | jq -r '.xray.cert_dir // empty')"
   # shellcheck disable=SC2154  # DEFAULT_XRAY_CERT_DIR from lib/defaults.sh
-  cert_dir="${DEFAULT_XRAY_CERT_DIR}"
+  [[ -n "${cert_dir}" ]] || cert_dir="${DEFAULT_XRAY_CERT_DIR}"
 
   if [[ -z "${domain}" ]]; then
     core::log warn "no domain found in state, skipping certificate check" "{}"
@@ -401,15 +402,18 @@ health::run() {
   fi
 
   # Load state to check topology for cert message
-  local state topology
+  local state topology cert_dir
   state="$(state::load)"
   topology="$(echo "${state}" | jq -r '.name // "unknown"')"
+  cert_dir="$(echo "${state}" | jq -r '.xray.cert_dir // empty')"
+  # shellcheck disable=SC2154  # DEFAULT_XRAY_CERT_DIR from lib/defaults.sh
+  [[ -n "${cert_dir}" ]] || cert_dir="${DEFAULT_XRAY_CERT_DIR}"
 
   if [[ "${topology}" != "vision-reality" ]]; then
     certs_msg="N/A (reality-only topology)"
   elif [[ "${certs_ok}" -eq 1 ]]; then
     # Extract expiry date
-    local cert_file="${DEFAULT_XRAY_CERT_DIR}/fullchain.pem"
+    local cert_file="${cert_dir}/fullchain.pem"
     local expiry_date
     expiry_date=$(openssl x509 -in "${cert_file}" -noout -enddate 2> /dev/null | cut -d= -f2 | awk '{print $1, $2, $4}')
     certs_msg="Valid until ${expiry_date}"
