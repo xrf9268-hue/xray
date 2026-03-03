@@ -9,16 +9,24 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 # shellcheck source=services/xray/common.sh
 . "${HERE}/services/xray/common.sh"
 
+systemd::escape_sed_replacement() {
+  printf '%s' "${1}" | sed -e 's/[|&\\]/\\&/g'
+}
+
 systemd::render_xray_unit() {
   local xray_bin confbase active_confdir
+  local xray_bin_esc confbase_esc active_confdir_esc
   xray_bin="$(xray::bin)"
   confbase="$(xray::confbase)"
   active_confdir="$(xray::active)"
+  xray_bin_esc="$(systemd::escape_sed_replacement "${xray_bin}")"
+  confbase_esc="$(systemd::escape_sed_replacement "${confbase}")"
+  active_confdir_esc="$(systemd::escape_sed_replacement "${active_confdir}")"
 
   sed \
-    -e "s|/usr/local/bin/xray|${xray_bin}|g" \
-    -e "s|/usr/local/etc/xray/active|${active_confdir}|g" \
-    -e "s|/usr/local/etc/xray|${confbase}|g" \
+    -e "s|/usr/local/bin/xray|${xray_bin_esc}|g" \
+    -e "s|/usr/local/etc/xray/active|${active_confdir_esc}|g" \
+    -e "s|/usr/local/etc/xray|${confbase_esc}|g" \
     "${HERE}/packaging/systemd/xray.service"
 }
 

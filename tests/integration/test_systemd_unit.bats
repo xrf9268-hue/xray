@@ -96,3 +96,38 @@ EOF
   grep -q "ExecStart=${XRF_PREFIX}/bin/xray run -confdir ${XRF_ETC}/xray/active -format json" "${XRF_SYSTEMD_DIR}/xray.service"
   grep -q "ReadWritePaths=${XRF_ETC}/xray" "${XRF_SYSTEMD_DIR}/xray.service"
 }
+
+@test "install_unit preserves special chars in rendered unit paths" {
+  export XRF_SYSTEMD_DIR="${XRF_ETC}/systemd/system"
+  export XRF_PREFIX="${TEST_ROOT}/prefix-a&b"
+  export XRF_ETC="${TEST_ROOT}/etc-a&b"
+  mkdir -p "${XRF_PREFIX}/bin" "${XRF_ETC}/xray/active" "${XRF_SYSTEMD_DIR}"
+
+  cat > "${TEST_ROOT}/bin/systemctl" <<'EOF'
+#!/usr/bin/env bash
+echo "systemctl $*" >> "${XRF_VAR}/systemctl.log"
+exit 0
+EOF
+  chmod +x "${TEST_ROOT}/bin/systemctl"
+
+  cat > "${TEST_ROOT}/bin/getent" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "group" && "${2:-}" == "xray" ]]; then
+  echo "xray:x:998:"
+  exit 0
+fi
+if [[ "${1:-}" == "passwd" && "${2:-}" == "xray" ]]; then
+  echo "xray:x:999:998::/var/lib/xray:/usr/sbin/nologin"
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "${TEST_ROOT}/bin/getent"
+
+  run "${PROJECT_ROOT}/services/xray/systemd-unit.sh" install
+
+  [ "$status" -eq 0 ]
+  [ -f "${XRF_SYSTEMD_DIR}/xray.service" ]
+  grep -Fq "ExecStart=${XRF_PREFIX}/bin/xray run -confdir ${XRF_ETC}/xray/active -format json" "${XRF_SYSTEMD_DIR}/xray.service"
+  grep -Fq "ReadWritePaths=${XRF_ETC}/xray" "${XRF_SYSTEMD_DIR}/xray.service"
+}
