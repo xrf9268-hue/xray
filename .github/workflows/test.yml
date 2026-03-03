@@ -28,6 +28,10 @@ permissions:
   contents: read     # Read repository contents
   actions: write     # Required for actions/upload-artifact
 
+env:
+  # Cache apt payloads in workspace to avoid permission issues restoring /var/cache/apt.
+  APT_CACHE_DIR: ${{ github.workspace }}/.cache/apt/archives
+
 jobs:
   lint:
     name: Lint (ShellCheck)
@@ -43,16 +47,17 @@ jobs:
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
-          # Cache only .deb payloads; avoid root-owned lock/partial entries.
-          path: /var/cache/apt/archives/*.deb
+          # Cache only .deb payloads in a user-writable directory.
+          path: ${{ env.APT_CACHE_DIR }}/*.deb
           key: apt-shellcheck-${{ runner.os }}-${{ hashFiles('.github/workflows/test.yml') }}
           restore-keys: |
             apt-shellcheck-${{ runner.os }}-
 
       - name: Install ShellCheck
         run: |
-          sudo apt-get update
-          sudo apt-get install -y shellcheck
+          mkdir -p "${APT_CACHE_DIR}/partial"
+          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" update
+          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" install -y shellcheck
 
       - name: Run ShellCheck
         run: make lint
@@ -112,16 +117,17 @@ jobs:
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
-          # Cache only .deb payloads; avoid root-owned lock/partial entries.
-          path: /var/cache/apt/archives/*.deb
+          # Cache only .deb payloads in a user-writable directory.
+          path: ${{ env.APT_CACHE_DIR }}/*.deb
           key: apt-bats-${{ runner.os }}-${{ matrix.ubuntu-version }}-${{ hashFiles('.github/workflows/test.yml') }}
           restore-keys: |
             apt-bats-${{ runner.os }}-${{ matrix.ubuntu-version }}-
 
       - name: Install bats-core
         run: |
-          sudo apt-get update
-          sudo apt-get install -y curl tar
+          mkdir -p "${APT_CACHE_DIR}/partial"
+          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" update
+          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" install -y curl tar
           BATS_VERSION="v1.13.0"
           tmpdir="$(mktemp -d)"
           curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
@@ -162,16 +168,17 @@ jobs:
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
-          # Cache only .deb payloads; avoid root-owned lock/partial entries.
-          path: /var/cache/apt/archives/*.deb
+          # Cache only .deb payloads in a user-writable directory.
+          path: ${{ env.APT_CACHE_DIR }}/*.deb
           key: apt-integration-${{ runner.os }}-${{ hashFiles('.github/workflows/test.yml') }}
           restore-keys: |
             apt-integration-${{ runner.os }}-
 
       - name: Install dependencies
         run: |
-          sudo apt-get update
-          sudo apt-get install -y curl tar unzip
+          mkdir -p "${APT_CACHE_DIR}/partial"
+          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" update
+          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" install -y curl tar unzip
           BATS_VERSION="v1.13.0"
           tmpdir="$(mktemp -d)"
           curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
