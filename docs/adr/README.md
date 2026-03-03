@@ -19,6 +19,7 @@ This directory contains Architecture Decision Records for the xray-fusion projec
 | [011](./011-xray-v25-review.md) | Xray v25.12.8 Updates Review | 2025-12-09 | Accepted |
 | [012](./012-xray-v26-review.md) | Xray v26.1.23 Updates Review | 2026-01-24 | Accepted |
 | [013](./013-xray-v26.2.6-review.md) | Xray v26.2.6 Alignment and Forward Compatibility | 2026-02-28 | Accepted |
+| [014](./014-kcov-bats-coverage.md) | kcov Coverage for Bash with bats-core | 2026-03-03 | Accepted |
 
 ## ADR Format
 

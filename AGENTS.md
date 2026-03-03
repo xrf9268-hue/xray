@@ -191,3 +191,6 @@ XRF_PLUGIN_DEPS=("curl" "jq")  # optional, auto-installed
 | Network download fails | Use `core::retry` |
 | Parse error after tool upgrade | Normalize labels before matching |
 | Trap "unbound variable" | Don't use traps in utility functions |
+| kcov exits non-zero with bats | DEBUG trap conflict; capture exit code, check `coverage.json` instead |
+| Prebuilt binary crashes in CI | Build from source and cache; prebuilt binaries assume specific shared libs |
+| Python f-string `SyntaxError` | No backslashes in f-string expressions before 3.12; use `%`-formatting |
