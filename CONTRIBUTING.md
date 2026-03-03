@@ -32,6 +32,7 @@ Thank you for your interest in contributing to xray-fusion! This document provid
 - ShellCheck for static analysis
 - shfmt for code formatting
 - bats-core for testing
+- kcov for real shell coverage (Linux may also require `libbinutils libdw1 libelf1`)
 
 ### Development Environment Setup
 
@@ -42,15 +43,16 @@ cd xray-fusion
 
 # Install development dependencies
 # Ubuntu/Debian
-sudo apt-get install shellcheck bats jq
+sudo apt-get install shellcheck shfmt bats jq kcov libbinutils libdw1 libelf1
 
 # macOS
-brew install shellcheck shfmt bats-core jq
+brew install shellcheck shfmt bats-core jq kcov
 
 # Verify tools are installed
 shellcheck --version
 shfmt -version
 bats --version
+kcov --version
 ```
 
 ### Running Tests
@@ -338,17 +340,18 @@ teardown() {
 
 ### Test Coverage
 
-Current test coverage: ~80%
+Coverage is measured using real shell execution with `kcov` in CI.
 
-**Covered modules**:
-- lib/args.sh (21 tests)
-- lib/core.sh (8 tests)
-- lib/plugins.sh (26 tests)
-- lib/validators.sh (9 tests - Phase 1 enhancements)
-- modules/io.sh (21 tests)
-- services/xray/common.sh (20 tests)
+- Unit coverage is gating and enforced by `.github/coverage/unit-threshold.txt` (ratchet baseline).
+- Integration coverage is collected and published as non-gating report artifacts.
+- CI summary for coverage is published in `.github/workflows/test.yml` run results.
 
-**See**: tests/unit/ directory for examples
+Local commands:
+
+```bash
+make coverage-unit-real
+make coverage-real
+```
 
 ---
 

@@ -55,9 +55,7 @@ jobs:
 
       - name: Install ShellCheck
         run: |
-          mkdir -p "${APT_CACHE_DIR}/partial"
-          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" update
-          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" install -y shellcheck
+          bash scripts/ci/apt-resilient.sh shellcheck
 
       - name: Run ShellCheck
         run: make lint
@@ -125,9 +123,7 @@ jobs:
 
       - name: Install bats-core
         run: |
-          mkdir -p "${APT_CACHE_DIR}/partial"
-          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" update
-          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" install -y curl tar
+          bash scripts/ci/apt-resilient.sh curl tar
           BATS_VERSION="v1.13.0"
           tmpdir="$(mktemp -d)"
           curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
@@ -176,9 +172,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          mkdir -p "${APT_CACHE_DIR}/partial"
-          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" update
-          sudo apt-get -o Dir::Cache::archives="${APT_CACHE_DIR}" install -y curl tar unzip
+          bash scripts/ci/apt-resilient.sh curl tar unzip
           BATS_VERSION="v1.13.0"
           tmpdir="$(mktemp -d)"
           curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
@@ -204,35 +198,124 @@ jobs:
           retention-days: 3
 
   coverage:
-    name: Test Coverage Summary
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: [unit-tests]  # IMPROVED: Removed lint dependency (not needed)
-    # IMPROVED: Run on all branches (not just main)
-    # Rationale: Developers should see coverage info during development
+    name: Real Shell Coverage (kcov)
+    runs-on: ubuntu-22.04
+    timeout-minutes: 20
+    needs: [unit-tests]
+    outputs:
+      unit_percent: ${{ steps.unit-coverage.outputs.unit_percent }}
+      unit_threshold: ${{ steps.unit-coverage.outputs.unit_threshold }}
+      integration_status: ${{ steps.integration-status.outputs.integration_status }}
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Display coverage summary
+      - name: Install coverage dependencies
         run: |
-          echo "## 📊 Test Coverage Summary (Manual Tracking)"
-          echo ""
-          echo "### Unit Tests (108 tests, ~85% coverage)"
-          echo "- ✅ lib/args.sh: 100% (21 tests)"
-          echo "- ✅ lib/validators.sh: 100% (12 tests)"
-          echo "- ✅ services/xray/common.sh: 100% (20 tests)"
-          echo "- ✅ modules/io.sh: 95% (21 tests)"
-          echo "- ✅ lib/plugins.sh: 90% (26 tests)"
-          echo "- ✅ lib/core.sh: 85% (8 tests)"
-          echo ""
-          echo "### Integration Tests (13/21 runnable, 62%)"
-          echo "- ✅ test_plugin_system.bats: 3/3 (100%)"
-          echo "- ⚠️ test_install_script.bats: 8/15 (53%)"
-          echo "- ⚠️ test_install_flow.bats: 2/3 (67%)"
-          echo ""
-          echo "⚠️ TODO: Integrate kcov or bashcov for automated coverage"
+          bash scripts/ci/apt-resilient.sh ca-certificates curl tar python3 jq libbinutils libdw1 libelf1
+
+      - name: Install bats-core
+        run: |
+          BATS_VERSION="v1.13.0"
+          tmpdir="$(mktemp -d)"
+          curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
+          sudo "${tmpdir}/bats-core-${BATS_VERSION#v}/install.sh" /usr/local
+          rm -rf "${tmpdir}"
+          bats -v
+
+      - name: Install kcov (pinned release)
+        run: |
+          KCOV_VERSION="v42"
+          KCOV_SHA256="78aa17a5f6d27a867cc0540b1550051591d350423a1a0ef98d63c9ce7cc10f9d"
+          tmpdir="$(mktemp -d)"
+          archive="${tmpdir}/kcov-amd64.tar.gz"
+          curl -fsSL "https://github.com/SimonKagstrom/kcov/releases/download/${KCOV_VERSION}/kcov-amd64.tar.gz" -o "${archive}"
+          echo "${KCOV_SHA256}  ${archive}" | sha256sum -c -
+          tar -xzf "${archive}" -C "${tmpdir}"
+          sudo install -m 0755 "${tmpdir}/usr/local/bin/kcov" /usr/local/bin/kcov
+          rm -rf "${tmpdir}"
+          kcov --version
+
+      - name: Collect unit coverage
+        id: unit-coverage
+        run: |
+          mkdir -p artifacts/coverage/unit
+          kcov --bash-method=DEBUG --exclude-path=/tmp --include-path="${GITHUB_WORKSPACE}" \
+            artifacts/coverage/unit \
+            bats tests/unit/*.bats
+
+          json_file="$(find artifacts/coverage/unit -name coverage.json | head -n1)"
+          if [[ -z "${json_file}" ]]; then
+            echo "coverage.json not found in artifacts/coverage/unit" >&2
+            exit 1
+          fi
+
+          unit_percent="$(
+            python3 - "${json_file}" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as f:
+    data = json.load(f)
+print(f"{float(data['percent_covered']):.2f}")
+PY
+          )"
+          unit_threshold="$(tr -d '[:space:]' < .github/coverage/unit-threshold.txt)"
+
+          echo "unit_percent=${unit_percent}" >> "${GITHUB_OUTPUT}"
+          echo "unit_threshold=${unit_threshold}" >> "${GITHUB_OUTPUT}"
+
+      - name: Enforce unit coverage threshold
+        run: |
+          python3 - "${{ steps.unit-coverage.outputs.unit_percent }}" "${{ steps.unit-coverage.outputs.unit_threshold }}" <<'PY'
+import sys
+actual = float(sys.argv[1])
+threshold = float(sys.argv[2])
+if actual < threshold:
+    print(f"Unit coverage gate failed: {actual:.2f}% < {threshold:.2f}%")
+    raise SystemExit(1)
+print(f"Unit coverage gate passed: {actual:.2f}% >= {threshold:.2f}%")
+PY
+
+      - name: Collect integration coverage (non-gating)
+        id: integration-coverage-run
+        continue-on-error: true
+        run: |
+          mkdir -p artifacts/coverage/integration
+          kcov --bash-method=DEBUG --exclude-path=/tmp --include-path="${GITHUB_WORKSPACE}" \
+            artifacts/coverage/integration \
+            bats tests/integration/*.bats
+
+      - name: Record integration coverage status
+        id: integration-status
+        if: always()
+        run: |
+          echo "integration_status=${{ steps.integration-coverage-run.outcome }}" >> "${GITHUB_OUTPUT}"
+
+      - name: Publish coverage summary
+        if: always()
+        run: |
+          {
+            echo "## 📊 Real Shell Coverage (kcov)"
+            echo ""
+            echo "- Unit coverage: ${{ steps.unit-coverage.outputs.unit_percent }}%"
+            echo "- Unit threshold: ${{ steps.unit-coverage.outputs.unit_threshold }}%"
+            echo "- Integration coverage status: ${{ steps.integration-status.outputs.integration_status }} (non-gating)"
+            echo ""
+            echo "Artifacts:"
+            echo "- \`artifacts/coverage/unit/**\`"
+            echo "- \`artifacts/coverage/integration/**\`"
+          } >> "${GITHUB_STEP_SUMMARY}"
+
+      - name: Upload coverage artifacts
+        if: always()
+        # actions/upload-artifact@v7.0.0 (pinned to commit SHA for security)
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        with:
+          name: coverage-results
+          path: artifacts/coverage/**
+          if-no-files-found: warn
+          retention-days: 7
 
   security-scan:
     name: Security Scan
@@ -288,7 +371,7 @@ jobs:
             echo "| Format Check (shfmt) | ${{ needs.format-check.result }} | Code formatting |"
             echo "| Unit Tests | ${{ needs.unit-tests.result }} | 108 tests across 2 Ubuntu versions |"
             echo "| Integration Tests | ${{ needs.integration-tests.result }} | 13/21 runnable tests |"
-            echo "| Coverage Summary | ${{ needs.coverage.result }} | ~85% overall coverage |"
+            echo "| Coverage Summary | ${{ needs.coverage.result }} | unit=${{ needs.coverage.outputs.unit_percent }}% (threshold=${{ needs.coverage.outputs.unit_threshold }}%), integration=${{ needs.coverage.outputs.integration_status }} |"
             echo "| Security Scan | ${{ needs.security-scan.result }} | ShellCheck + secret detection |"
             echo ""
             echo "### 📊 Workflow Details"

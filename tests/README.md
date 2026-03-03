@@ -34,6 +34,9 @@ cd bats-core
 sudo ./install.sh /usr/local
 ```
 
+For real shell coverage commands (`make coverage-unit-real`), install `kcov` too.
+On Ubuntu, if `kcov` reports missing shared libs, install `libbinutils libdw1 libelf1`.
+
 ## Running Tests
 
 ```bash
@@ -127,12 +130,9 @@ teardown() {
 - **Test files**: 5
 - **Test cases**: 82
 - **Code coverage**:
-  - lib/args.sh: 100%
-  - lib/core.sh: ~85%
-  - lib/plugins.sh: ~90%
-  - modules/io.sh: ~95%
-  - services/xray/common.sh: 100%
-  - **Overall**: ~80%
+  - Collected with real shell execution via `kcov` (not estimated from test counts)
+  - Unit coverage is gating in CI (`.github/coverage/unit-threshold.txt`)
+  - Integration coverage is reported as non-gating artifacts
 
 ### TODO
 
@@ -143,6 +143,13 @@ teardown() {
 ## CI/CD Integration
 
 Tests run automatically in GitHub Actions (see `.github/workflows/test.yml`).
+
+Coverage commands:
+
+```bash
+make coverage-unit-real
+make coverage-real
+```
 
 ## Best Practices
 
