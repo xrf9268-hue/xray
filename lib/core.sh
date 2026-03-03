@@ -653,7 +653,7 @@ core::with_flock() {
 
   if command -v flock > /dev/null 2>&1; then
     (
-      exec 200>"${lock}"
+      exec 200> "${lock}"
       if ! flock -w "${lock_timeout}" -x 200; then
         core::log error "timed out waiting for lock" "$(printf '{"lock":"%s","timeout_sec":%d}' "$(core::json_escape "${lock}")" "${lock_timeout}")"
         exit 1

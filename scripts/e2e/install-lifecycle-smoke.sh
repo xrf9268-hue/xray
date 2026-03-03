@@ -19,12 +19,12 @@ run_in_container_retry() {
   local delay=2
   local attempt
 
-  for ((attempt=1; attempt<=attempts; attempt++)); do
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
     if run_in_container "${cmd}"; then
       return 0
     fi
 
-    if (( attempt == attempts )); then
+    if ((attempt == attempts)); then
       return 1
     fi
 
