@@ -120,7 +120,13 @@ jobs:
       - name: Install bats-core
         run: |
           sudo apt-get update
-          sudo apt-get install -y bats
+          sudo apt-get install -y curl tar
+          BATS_VERSION="v1.13.0"
+          tmpdir="$(mktemp -d)"
+          curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
+          sudo "${tmpdir}/bats-core-${BATS_VERSION#v}/install.sh" /usr/local
+          rm -rf "${tmpdir}"
+          bats -v
 
       - name: Run unit tests
         run: make test-unit
@@ -161,7 +167,13 @@ jobs:
       - name: Install dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y bats curl unzip
+          sudo apt-get install -y curl tar unzip
+          BATS_VERSION="v1.13.0"
+          tmpdir="$(mktemp -d)"
+          curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
+          sudo "${tmpdir}/bats-core-${BATS_VERSION#v}/install.sh" /usr/local
+          rm -rf "${tmpdir}"
+          bats -v
 
       - name: Run integration tests
         # Continue on error since some tests are marked as skip
