@@ -153,7 +153,7 @@ decode_base64() {
 }
 
 @test "export without format - shows usage and exits 0" {
-  run "${PROJECT_ROOT}/commands/export.sh"
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/commands/export.sh"
 
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"Usage: xrf export"* ]]
