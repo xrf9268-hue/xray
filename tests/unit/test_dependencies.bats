@@ -476,12 +476,22 @@ EOF
   create_fake_cmd "${fake_bin}" "apt-get" "exit 42"
   export PATH="${fake_bin}:${PATH}"
 
+  command() {
+    if [[ "${1:-}" == "-v" && "${2:-}" == "sudo" ]]; then
+      return 1
+    fi
+    builtin command "$@" 2>/dev/null
+  }
+  export -f command
+
   deps::detect_package_manager() {
     echo "apt-get"
   }
 
   run deps::install_packages "curl"
   [ "$status" -eq 1 ]
+
+  unset -f command
 }
 
 @test "deps::install_packages - fails for unsupported package manager value" {
