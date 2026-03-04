@@ -151,6 +151,55 @@ make coverage-unit-real
 make coverage-real
 ```
 
+### Local Docker Coverage (Host Fallback)
+
+If host `kcov` is unstable (for example, "Can't start/attach to bats" on macOS),
+run coverage in an Ubuntu container with the same strategy as CI.
+
+```bash
+docker run --rm -v "$PWD":/workspace -w /workspace ubuntu:24.04 bash -lc '
+set -euo pipefail
+export DEBIAN_FRONTEND=noninteractive
+
+# Optional: switch to a local mirror when upstream apt is unstable.
+# sed -i "s|http://ports.ubuntu.com/ubuntu-ports/|http://<mirror>/ubuntu-ports/|g" /etc/apt/sources.list.d/ubuntu.sources
+
+apt-get update -o Acquire::Retries=3
+apt-get install -y --no-install-recommends \
+  ca-certificates curl tar python3 jq cmake g++ make pkg-config \
+  libdw-dev libelf-dev libiberty-dev libcurl4-openssl-dev libssl-dev \
+  zlib1g-dev binutils-dev git
+
+BATS_VERSION=v1.13.0
+tmpdir="$(mktemp -d)"
+curl -fsSL "https://github.com/bats-core/bats-core/archive/refs/tags/${BATS_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
+"${tmpdir}/bats-core-${BATS_VERSION#v}/install.sh" /usr/local
+rm -rf "${tmpdir}"
+
+KCOV_VERSION=v42
+tmpdir="$(mktemp -d)"
+curl -fsSL "https://github.com/SimonKagstrom/kcov/archive/refs/tags/${KCOV_VERSION}.tar.gz" | tar -xz -C "${tmpdir}"
+cd "${tmpdir}/kcov-${KCOV_VERSION#v}"
+mkdir build && cd build
+cmake -DCMAKE_INSTALL_PREFIX=/usr/local ..
+make -j"$(nproc)"
+make install
+
+cd /workspace
+kcov --bash-dont-parse-binary-dir \
+  --include-path="/workspace/lib,/workspace/commands,/workspace/modules,/workspace/services,/workspace/plugins,/workspace/bin" \
+  --exclude-path=/tmp \
+  artifacts/coverage/docker-unit \
+  bats tests/unit/*.bats || true
+'
+```
+
+Notes:
+
+- `kcov` may exit non-zero with bats because of `DEBUG` trap conflicts; parse `coverage.json` and use it as the source of truth.
+- In this report format, per-file entries use `.file` (not `.filename`).
+- Typical output path: `artifacts/coverage/docker-unit/**/coverage.json`.
+
 ## Best Practices
 
 1. **Isolation**: Each test uses independent temporary directories

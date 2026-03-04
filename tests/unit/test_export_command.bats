@@ -152,11 +152,49 @@ decode_base64() {
   [[ "${output}" == *"Formats:"* ]]
 }
 
+@test "export without format - shows usage and exits 0" {
+  run "${PROJECT_ROOT}/commands/export.sh"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"Usage: xrf export"* ]]
+}
+
 @test "export all --out-dir without value - exits with error" {
   run "${PROJECT_ROOT}/commands/export.sh" all --out-dir
 
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"missing value for --out-dir"* ]]
+}
+
+@test "export all --out-dir writes files to explicit directory" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  local out_dir="${TEST_TMPDIR}/exports-opt"
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/commands/export.sh" all --out-dir "${out_dir}"
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"Export files written to: ${out_dir}"* ]]
+  [ -f "${out_dir}/uri.txt" ]
+  [ -f "${out_dir}/v2rayn.json" ]
+  [ -f "${out_dir}/clash.yaml" ]
+  [ -f "${out_dir}/subscription.txt" ]
+}
+
+@test "export uri --unknown-option - exits with error" {
+  run "${PROJECT_ROOT}/commands/export.sh" uri --unknown-option
+
+  [ "${status}" -eq 1 ]
+  [[ "${output}" == *"unknown option"* ]]
+  [[ "${output}" == *"Usage: xrf export"* ]]
 }
 
 @test "export uri - fails when no usable links exist in state" {
@@ -194,6 +232,24 @@ decode_base64() {
 
   [ "${status}" -eq 0 ]
   [[ "${output}" == *"sid=fedcba9876543210"* ]]
+}
+
+@test "export uri - vision link uses VISION label format" {
+  write_state '{
+    "name": "vision-reality",
+    "xray": {
+      "domain": "example.com",
+      "vision_port": 8443,
+      "uuid_vision": "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+      "fingerprint": "chrome"
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/commands/export.sh" uri
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"VISION : vless://aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee@example.com:8443"* ]]
+  [[ "${output}" != *"REALITY:"* ]]
 }
 
 @test "export v2rayn - vision-reality contains tls and reality outbounds" {
@@ -244,6 +300,37 @@ decode_base64() {
 
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"qrencode not found"* ]]
+}
+
+@test "export qr - renders links when qrencode is available" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "reality_sni": "www.microsoft.com",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  local mock_bin="${TEST_TMPDIR}/mock-qr"
+  mkdir -p "${mock_bin}"
+  cat > "${mock_bin}/qrencode" << 'MOCK_QR'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-t" && "${2:-}" == "ANSIUTF8" ]]; then
+  printf 'MOCK-QR:%s\n' "${3:-}"
+else
+  printf 'MOCK-QR:%s\n' "${*}"
+fi
+MOCK_QR
+  chmod +x "${mock_bin}/qrencode"
+
+  run env PATH="${mock_bin}:$PATH" XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/commands/export.sh" qr
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"REALITY"* ]]
+  [[ "${output}" == *"MOCK-QR:vless://11111111-2222-3333-4444-555555555555@203.0.113.10:443"* ]]
 }
 
 @test "export unknown subcommand - exits with error" {

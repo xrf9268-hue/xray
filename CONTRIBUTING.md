@@ -353,6 +353,16 @@ make coverage-unit-real
 make coverage-real
 ```
 
+If host `kcov` is unstable, run coverage in Docker using the CI-compatible flow
+(build `kcov` from source inside Linux). See `tests/README.md` section
+"Local Docker Coverage (Host Fallback)" for a copy-paste command.
+
+Practical notes:
+
+- Treat `coverage.json` as authoritative when `kcov` exits non-zero with bats.
+- Ensure build deps include `make` and `libssl-dev` (required by CMake build of `kcov`).
+- If apt registry errors occur (for example transient HTTP 5xx), retry and/or switch mirror.
+
 ---
 
 ## Commit Guidelines
