@@ -2,6 +2,46 @@
 
 Detailed patterns and conventions for xray-fusion development.
 
+## Scope
+
+- Applies to the entire repository rooted at this `AGENTS.md`.
+- If a deeper directory contains another `AGENTS.md`, the deeper file takes precedence for that subtree.
+- This file is operational guidance for coding agents and should stay aligned with `CONTRIBUTING.md`.
+
+## Execution Rules
+
+### Always
+
+- Prefer targeted changes and keep diffs minimal.
+- Use structured logging via `core::log`; do not add new plain `echo` logging in library/runtime paths.
+- Update tests and docs when behavior changes (especially `tests/README.md`, `CONTRIBUTING.md`, and relevant service docs).
+- Run verification commands relevant to the changed area before claiming completion.
+
+### Never
+
+- Do not add `trap ... EXIT` patterns in utility/library functions.
+- Do not bypass shellcheck/shfmt conventions for shell files.
+- Do not enable Docker proxy fallback in GitHub CI; local-only fallback is allowed (see Testing section).
+
+## Change-Triggered Verification
+
+Run these checks based on what you changed:
+
+- `lib/**`, `modules/**`, `commands/**`, `services/**`, `plugins/**`, `bin/**`:
+  `make fmt && make lint && make test-unit`
+- `.github/workflows/**`, `.github/dependabot.yml`:
+  `bats -t tests/unit/test_github_metadata.bats`
+- `scripts/e2e/install-lifecycle-smoke.sh`:
+  `bash -n scripts/e2e/install-lifecycle-smoke.sh`
+- `tests/**`:
+  run the specific changed bats file(s), then `make test-unit`
+
+Before opening a PR, prefer running full test suite when feasible:
+
+```bash
+make test
+```
+
 ## Key APIs
 
 ### Core Utilities (`lib/core.sh`)
@@ -111,7 +151,16 @@ bats -t tests/unit/test-core.bats
 
 # Test with sandbox paths
 XRF_PREFIX=$PWD/tmp/prefix XRF_ETC=$PWD/tmp/etc bin/xrf install --topology reality-only
+
+# Local e2e smoke test (Docker)
+scripts/e2e/install-lifecycle-smoke.sh
 ```
+
+- Local e2e Docker test may fallback to `docker.950288.xyz/library/ubuntu:24.04` when `ubuntu:24.04` pull fails.
+- GitHub CI must stay on official source only (`GITHUB_ACTIONS=true` path disables proxy fallback).
+- Optional overrides:
+  - `XRF_SMOKE_BASE_IMAGE` (default: `ubuntu:24.04`)
+  - `XRF_SMOKE_FALLBACK_IMAGE` (default: `docker.950288.xyz/library/ubuntu:24.04`)
 
 ## Xray Configuration
 
@@ -161,9 +210,14 @@ my_function() {
 
 ## Commit Guidelines
 
-- Imperative mood: "Fix bug" not "Fixed bug"
-- Reference areas: `lib:`, `commands:`, `services:`
-- Run `make fmt && make lint && make test-unit` before commit
+- Use Conventional Commits: `<type>(<scope>): <subject>`
+- Keep subject imperative and concise (prefer <72 chars)
+- Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`
+- Before commit, run at minimum:
+
+```bash
+make fmt && make lint && make test-unit
+```
 
 ## Plugin System
 

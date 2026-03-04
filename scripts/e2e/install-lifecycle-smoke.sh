@@ -4,6 +4,8 @@ set -eEuo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 CONTAINER_NAME="xrf-smoke-$(date +%s)"
 CURRENT_SCENARIO="setup"
+DEFAULT_BASE_IMAGE="${XRF_SMOKE_BASE_IMAGE:-ubuntu:24.04}"
+LOCAL_FALLBACK_IMAGE="${XRF_SMOKE_FALLBACK_IMAGE:-docker.950288.xyz/library/ubuntu:24.04}"
 
 log() {
   printf '[smoke] %s\n' "$*"
@@ -113,13 +115,54 @@ cleanup() {
 trap on_error ERR
 trap cleanup EXIT
 
+select_base_image() {
+  local selected="${DEFAULT_BASE_IMAGE}"
+  SELECTED_BASE_IMAGE=""
+
+  if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+    log "GitHub Actions detected; using official image only: ${selected}"
+    SELECTED_BASE_IMAGE="${selected}"
+    return 0
+  fi
+
+  if docker image inspect "${selected}" > /dev/null 2>&1; then
+    log "using locally cached base image ${selected}"
+    SELECTED_BASE_IMAGE="${selected}"
+    return 0
+  fi
+
+  log "pulling base image ${selected}"
+  if docker pull "${selected}" > /dev/null 2>&1; then
+    SELECTED_BASE_IMAGE="${selected}"
+    return 0
+  fi
+
+  if docker image inspect "${LOCAL_FALLBACK_IMAGE}" > /dev/null 2>&1; then
+    log "using locally cached fallback image ${LOCAL_FALLBACK_IMAGE}"
+    SELECTED_BASE_IMAGE="${LOCAL_FALLBACK_IMAGE}"
+    return 0
+  fi
+
+  log "official image pull failed, falling back to ${LOCAL_FALLBACK_IMAGE}"
+  if docker pull "${LOCAL_FALLBACK_IMAGE}" > /dev/null 2>&1; then
+    SELECTED_BASE_IMAGE="${LOCAL_FALLBACK_IMAGE}"
+    return 0
+  fi
+
+  log "failed to pull both ${selected} and ${LOCAL_FALLBACK_IMAGE}"
+  return 1
+}
+
 if ! command -v docker > /dev/null 2>&1; then
   log "docker is required"
   exit 1
 fi
 
 log "starting container ${CONTAINER_NAME}"
-docker run -d --name "${CONTAINER_NAME}" ubuntu:24.04 sleep infinity > /dev/null
+select_base_image
+BASE_IMAGE="${SELECTED_BASE_IMAGE}"
+log "starting container ${CONTAINER_NAME} with image ${BASE_IMAGE}"
+docker run -d --name "${CONTAINER_NAME}" "${BASE_IMAGE}" sleep infinity > /dev/null
 
 log "installing test dependencies"
 CURRENT_SCENARIO="dependency install"

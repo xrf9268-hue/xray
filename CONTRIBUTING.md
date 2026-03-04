@@ -362,6 +362,7 @@ Practical notes:
 - Treat `coverage.json` as authoritative when `kcov` exits non-zero with bats.
 - Ensure build deps include `make` and `libssl-dev` (required by CMake build of `kcov`).
 - If apt registry errors occur (for example transient HTTP 5xx), retry and/or switch mirror.
+- For local Docker-based coverage, `docker.950288.xyz` can be used as a fallback image source; GitHub CI does not use this mirror.
 
 ---
 
