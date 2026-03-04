@@ -68,9 +68,15 @@ set_apt_mirror() {
 install_test_dependencies() {
   local mirrors=(
     "http://ports.ubuntu.com"
+    # Try HTTPS mirrors first for environments that block outbound port 80.
+    # Keep HTTP mirrors to survive bootstrap stages where CA roots are not yet
+    # available in minimal containers.
     "https://mirrors.tuna.tsinghua.edu.cn"
+    "http://mirrors.tuna.tsinghua.edu.cn"
     "https://mirrors.aliyun.com"
+    "http://mirrors.aliyun.com"
     "https://mirrors.ustc.edu.cn"
+    "http://mirrors.ustc.edu.cn"
   )
   local mirror
 
