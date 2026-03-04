@@ -68,9 +68,11 @@ set_apt_mirror() {
 install_test_dependencies() {
   local mirrors=(
     "http://ports.ubuntu.com"
-    "https://mirrors.tuna.tsinghua.edu.cn"
-    "https://mirrors.aliyun.com"
-    "https://mirrors.ustc.edu.cn"
+    # Use HTTP mirrors for bootstrap reliability in minimal containers where
+    # CA roots may not be available before ca-certificates is installed.
+    "http://mirrors.tuna.tsinghua.edu.cn"
+    "http://mirrors.aliyun.com"
+    "http://mirrors.ustc.edu.cn"
   )
   local mirror
 
