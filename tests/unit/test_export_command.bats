@@ -235,10 +235,12 @@ decode_base64() {
 
   local mock_bin="${TEST_TMPDIR}/mock-bin"
   mkdir -p "${mock_bin}"
-  ln -s "$(command -v bash)" "${mock_bin}/bash"
-  ln -s "$(command -v jq)" "${mock_bin}/jq"
+  local required_cmd
+  for required_cmd in bash cat date dirname head jq mkdir pwd; do
+    ln -s "$(command -v "${required_cmd}")" "${mock_bin}/${required_cmd}"
+  done
 
-  run env PATH="${mock_bin}:/usr/bin:/bin" XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/commands/export.sh" qr
+  run env PATH="${mock_bin}" XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/commands/export.sh" qr
 
   [ "${status}" -eq 1 ]
   [[ "${output}" == *"qrencode not found"* ]]
