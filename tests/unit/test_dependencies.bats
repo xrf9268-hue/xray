@@ -11,6 +11,19 @@ teardown() {
   cleanup_test_env
 }
 
+create_fake_cmd() {
+  local dir="${1}"
+  local name="${2}"
+  local body="${3}"
+
+  mkdir -p "${dir}"
+  {
+    printf '#!/usr/bin/env bash\n'
+    printf '%s\n' "${body}"
+  } > "${dir}/${name}"
+  chmod +x "${dir}/${name}"
+}
+
 # =============================================================================
 # deps::check_critical
 # =============================================================================
@@ -313,4 +326,245 @@ EOF
   else
     skip "Test environment missing some optional tools"
   fi
+}
+
+# =============================================================================
+# deps::print_install_help
+# =============================================================================
+
+@test "deps::print_install_help - maps systemctl to systemd across package managers" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  run deps::print_install_help "curl" "systemctl" "tar"
+  [ "$status" -eq 0 ]
+  [[ "$output" =~ "Missing tools: curl systemctl tar" ]]
+  [[ "$output" =~ "apt-get install -y curl systemd tar" ]]
+  [[ "$output" =~ "yum install -y curl systemd tar" ]]
+  [[ "$output" =~ "pacman -S curl systemd tar" ]]
+}
+
+# =============================================================================
+# deps::detect_package_manager
+# =============================================================================
+
+@test "deps::detect_package_manager - returns first supported manager in priority order" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  local fake_bin="${TEST_TMPDIR}/bin"
+  create_fake_cmd "${fake_bin}" "apt-get" 'exit 0'
+  create_fake_cmd "${fake_bin}" "dnf" 'exit 0'
+  export PATH="${fake_bin}:${PATH}"
+
+  run deps::detect_package_manager
+  [ "$status" -eq 0 ]
+  [ "$output" = "apt-get" ]
+}
+
+@test "deps::detect_package_manager - uses cached manager when available" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  _XRF_DETECTED_PM="cached-manager"
+  run deps::detect_package_manager
+  [ "$status" -eq 0 ]
+  [ "$output" = "cached-manager" ]
+}
+
+@test "deps::detect_package_manager - returns failure when no supported manager exists" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  command() {
+    if [[ "${1:-}" == "-v" ]]; then
+      case "${2:-}" in
+        apt-get|dnf|yum|apk|zypper|pacman) return 1 ;;
+        *) ;;
+      esac
+    fi
+    builtin command "$@" 2>/dev/null
+  }
+  export -f command
+
+  run deps::detect_package_manager
+  [ "$status" -eq 1 ]
+
+  unset -f command
+}
+
+# =============================================================================
+# deps::install_packages
+# =============================================================================
+
+@test "deps::install_packages - succeeds when package list is empty" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  run deps::install_packages
+  [ "$status" -eq 0 ]
+}
+
+@test "deps::install_packages - fails when no package manager is detected" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  deps::detect_package_manager() {
+    return 1
+  }
+
+  run deps::install_packages "curl"
+  [ "$status" -eq 1 ]
+}
+
+@test "deps::install_packages - runs apt-get directly when sudo is unavailable" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  local fake_bin="${TEST_TMPDIR}/bin"
+  local cmd_log="${TEST_TMPDIR}/apt-get.log"
+  create_fake_cmd "${fake_bin}" "apt-get" "printf '%s\\n' \"\$*\" > \"${cmd_log}\""
+  export PATH="${fake_bin}:${PATH}"
+
+  command() {
+    if [[ "${1:-}" == "-v" && "${2:-}" == "sudo" ]]; then
+      return 1
+    fi
+    builtin command "$@" 2>/dev/null
+  }
+  export -f command
+
+  deps::detect_package_manager() {
+    echo "apt-get"
+  }
+
+  run deps::install_packages "curl" "jq"
+  [ "$status" -eq 0 ]
+  [ -f "${cmd_log}" ]
+  run cat "${cmd_log}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "install -y curl jq" ]
+
+  unset -f command
+}
+
+@test "deps::install_packages - prefixes sudo when available and not root" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  if [[ "${EUID}" -eq 0 ]]; then
+    skip "requires non-root user to verify sudo path"
+  fi
+
+  local fake_bin="${TEST_TMPDIR}/bin"
+  local sudo_log="${TEST_TMPDIR}/sudo.log"
+  local apt_log="${TEST_TMPDIR}/apt-get.log"
+  create_fake_cmd "${fake_bin}" "apt-get" "printf '%s\\n' \"\$*\" > \"${apt_log}\""
+  create_fake_cmd "${fake_bin}" "sudo" "printf '%s\\n' \"\$*\" > \"${sudo_log}\"; \"\$@\""
+  export PATH="${fake_bin}:${PATH}"
+
+  deps::detect_package_manager() {
+    echo "apt-get"
+  }
+
+  run deps::install_packages "curl"
+  [ "$status" -eq 0 ]
+  run cat "${sudo_log}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "apt-get install -y curl" ]
+  run cat "${apt_log}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "install -y curl" ]
+}
+
+@test "deps::install_packages - returns failure when package command fails" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  local fake_bin="${TEST_TMPDIR}/bin"
+  create_fake_cmd "${fake_bin}" "apt-get" "exit 42"
+  export PATH="${fake_bin}:${PATH}"
+
+  command() {
+    if [[ "${1:-}" == "-v" && "${2:-}" == "sudo" ]]; then
+      return 1
+    fi
+    builtin command "$@" 2>/dev/null
+  }
+  export -f command
+
+  deps::detect_package_manager() {
+    echo "apt-get"
+  }
+
+  run deps::install_packages "curl"
+  [ "$status" -eq 1 ]
+
+  unset -f command
+}
+
+@test "deps::install_packages - fails for unsupported package manager value" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  deps::detect_package_manager() {
+    echo "unknown-pm"
+  }
+
+  run deps::install_packages "curl"
+  [ "$status" -eq 1 ]
+}
+
+# =============================================================================
+# deps::check_and_install_plugin_deps
+# =============================================================================
+
+@test "deps::check_and_install_plugin_deps - succeeds when no deps declared" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  run deps::check_and_install_plugin_deps "demo-plugin"
+  [ "$status" -eq 0 ]
+}
+
+@test "deps::check_and_install_plugin_deps - succeeds when all deps already installed" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  local fake_bin="${TEST_TMPDIR}/bin"
+  create_fake_cmd "${fake_bin}" "dep-ok" "exit 0"
+  export PATH="${fake_bin}:${PATH}"
+
+  run deps::check_and_install_plugin_deps "demo-plugin" "dep-ok"
+  [ "$status" -eq 0 ]
+}
+
+@test "deps::check_and_install_plugin_deps - auto-installs missing deps in non-interactive mode" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  local fake_bin="${TEST_TMPDIR}/empty-bin"
+  local install_log="${TEST_TMPDIR}/install.log"
+  mkdir -p "${fake_bin}"
+  export PATH="${fake_bin}:${PATH}"
+  unset XRF_AUTO_INSTALL_DEPS
+
+  deps::install_packages() {
+    printf '%s\n' "$*" > "${install_log}"
+    return 0
+  }
+
+  run deps::check_and_install_plugin_deps "demo-plugin" "dep-a" "dep-b"
+  [ "$status" -eq 0 ]
+  run cat "${install_log}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "dep-a dep-b" ]
+}
+
+@test "deps::check_and_install_plugin_deps - returns failure when auto-install fails" {
+  source "${PROJECT_ROOT}/lib/dependencies.sh"
+
+  local fake_bin="${TEST_TMPDIR}/empty-bin"
+  local install_log="${TEST_TMPDIR}/install.log"
+  mkdir -p "${fake_bin}"
+  export PATH="${fake_bin}:${PATH}"
+  export XRF_AUTO_INSTALL_DEPS="true"
+
+  deps::install_packages() {
+    printf '%s\n' "$*" > "${install_log}"
+    return 1
+  }
+
+  run deps::check_and_install_plugin_deps "demo-plugin" "dep-a"
+  [ "$status" -eq 1 ]
+  run cat "${install_log}"
+  [ "$status" -eq 0 ]
+  [ "$output" = "dep-a" ]
 }
