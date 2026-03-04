@@ -125,9 +125,21 @@ select_base_image() {
     return 0
   fi
 
+  if docker image inspect "${selected}" > /dev/null 2>&1; then
+    log "using locally cached base image ${selected}"
+    SELECTED_BASE_IMAGE="${selected}"
+    return 0
+  fi
+
   log "pulling base image ${selected}"
   if docker pull "${selected}" > /dev/null 2>&1; then
     SELECTED_BASE_IMAGE="${selected}"
+    return 0
+  fi
+
+  if docker image inspect "${LOCAL_FALLBACK_IMAGE}" > /dev/null 2>&1; then
+    log "using locally cached fallback image ${LOCAL_FALLBACK_IMAGE}"
+    SELECTED_BASE_IMAGE="${LOCAL_FALLBACK_IMAGE}"
     return 0
   fi
 
