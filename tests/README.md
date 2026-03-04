@@ -157,7 +157,13 @@ If host `kcov` is unstable (for example, "Can't start/attach to bats" on macOS),
 run coverage in an Ubuntu container with the same strategy as CI.
 
 ```bash
-docker run --rm -v "$PWD":/workspace -w /workspace ubuntu:24.04 bash -lc '
+BASE_IMAGE="ubuntu:24.04"
+if [[ "${GITHUB_ACTIONS:-}" != "true" ]]; then
+  docker pull "${BASE_IMAGE}" >/dev/null 2>&1 || BASE_IMAGE="docker.950288.xyz/library/ubuntu:24.04"
+  docker pull "${BASE_IMAGE}" >/dev/null
+fi
+
+docker run --rm -v "$PWD":/workspace -w /workspace "${BASE_IMAGE}" bash -lc '
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 
@@ -193,6 +199,11 @@ kcov --bash-dont-parse-binary-dir \
   bats tests/unit/*.bats || true
 '
 ```
+
+Notes for image source:
+
+- Local runs may fall back to `docker.950288.xyz/library/ubuntu:24.04` when Docker Hub is unavailable.
+- GitHub CI (`.github/workflows/test.yml`) does not use this proxy mirror.
 
 Notes:
 
