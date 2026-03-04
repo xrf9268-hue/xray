@@ -111,7 +111,16 @@ bats -t tests/unit/test-core.bats
 
 # Test with sandbox paths
 XRF_PREFIX=$PWD/tmp/prefix XRF_ETC=$PWD/tmp/etc bin/xrf install --topology reality-only
+
+# Local e2e smoke test (Docker)
+scripts/e2e/install-lifecycle-smoke.sh
 ```
+
+- Local e2e Docker test may fallback to `docker.950288.xyz/library/ubuntu:24.04` when `ubuntu:24.04` pull fails.
+- GitHub CI must stay on official source only (`GITHUB_ACTIONS=true` path disables proxy fallback).
+- Optional overrides:
+  - `XRF_SMOKE_BASE_IMAGE` (default: `ubuntu:24.04`)
+  - `XRF_SMOKE_FALLBACK_IMAGE` (default: `docker.950288.xyz/library/ubuntu:24.04`)
 
 ## Xray Configuration
 
