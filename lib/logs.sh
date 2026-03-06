@@ -18,6 +18,53 @@ readonly COLOR_GREEN='\033[0;32m'
 readonly COLOR_GRAY='\033[0;90m'
 
 ##
+# Internal function: stream command output through the log formatter
+#
+# Preserves the producer command's exit status instead of losing it to a
+# formatter pipeline, while still allowing streaming output for follow mode.
+#
+# Arguments:
+#   $1 - Log level filter
+#   $2 - Disable colors (true|false)
+#   $@ - Command and arguments to execute
+#
+# Returns:
+#   0 - Command succeeded and output was formatted
+#   1 - Command execution failed or FIFO setup failed
+##
+logs::_run_formatted_command() {
+  local level="${1:-all}"
+  local no_color="${2:-false}"
+  shift 2
+
+  local fifo=""
+  fifo="$(mktemp "${TMPDIR:-/tmp}/xray-logs.XXXXXX")" || return 1
+  rm -f "${fifo}" 2> /dev/null || return 1
+
+  if ! mkfifo "${fifo}"; then
+    rm -f "${fifo}" 2> /dev/null || true
+    return 1
+  fi
+
+  "$@" > "${fifo}" 2> /dev/null &
+  local cmd_pid=$!
+
+  logs::_format "${level}" "${no_color}" < "${fifo}"
+  local format_rc=$?
+
+  wait "${cmd_pid}"
+  local cmd_rc=$?
+
+  rm -f "${fifo}" 2> /dev/null || true
+
+  if [[ "${cmd_rc}" -ne 0 ]]; then
+    return 1
+  fi
+
+  return "${format_rc}"
+}
+
+##
 # View Xray logs with filtering options
 #
 # Displays Xray service logs from journald with optional filtering
@@ -67,10 +114,10 @@ logs::view() {
   core::log debug "viewing logs" "$(printf '{"level":"%s","since":"%s","lines":%d}' "${level}" "${since}" "${lines}")"
 
   # Execute journalctl and filter/format output
-  if ! "${cmd[@]}" 2> /dev/null; then
+  if ! logs::_run_formatted_command "${level}" "${no_color}" "${cmd[@]}"; then
     core::log error "failed to retrieve logs" '{"suggestion":"ensure xray service is running"}'
     return 1
-  fi | logs::_format "${level}" "${no_color}"
+  fi
 }
 
 ##
@@ -108,10 +155,10 @@ logs::follow() {
   local cmd=(journalctl -u xray.service -f --output=short-iso --no-pager)
 
   # Execute and format
-  if ! "${cmd[@]}" 2> /dev/null; then
+  if ! logs::_run_formatted_command "${level}" "${no_color}" "${cmd[@]}"; then
     core::log error "failed to follow logs" '{"suggestion":"ensure xray service is running"}'
     return 1
-  fi | logs::_format "${level}" "${no_color}"
+  fi
 }
 
 ##
@@ -155,7 +202,7 @@ logs::export() {
   cmd+=(--output=short-iso --no-pager)
 
   # Export to file (no formatting, no color)
-  if ! "${cmd[@]}" 2> /dev/null | logs::_format "${level}" "true" > "${output_file}"; then
+  if ! logs::_run_formatted_command "${level}" "true" "${cmd[@]}" > "${output_file}"; then
     core::log error "failed to export logs" "$(printf '{"file":"%s"}' "${output_file}")"
     return 1
   fi
