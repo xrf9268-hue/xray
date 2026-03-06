@@ -394,3 +394,77 @@ EOF
   [ "$status" -eq 0 ]
   [[ "$output" == "v26.2.6" ]]
 }
+
+@test "xray::installed_version - uses -version output when it is parseable" {
+  local mock_bin="${TEST_TMPDIR}/mock-xray-version"
+  cat > "${mock_bin}" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "-version" ]]; then
+  echo "Xray 27.0.1 (mock build)"
+  exit 0
+fi
+if [[ "${1:-}" == "version" ]]; then
+  echo "Xray 99.0.0 (should not be used)"
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "${mock_bin}"
+
+  run xray::installed_version "${mock_bin}"
+  [ "$status" -eq 0 ]
+  [[ "$output" == "v27.0.1" ]]
+}
+
+@test "xray::extract_compat_warnings - reports specific TLS deprecations" {
+  run xray::extract_compat_warnings "allowInsecure and serverNameToVerify are deprecated"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"allowInsecure detected"* ]]
+  [[ "$output" == *"verifyPeerCertInNames or serverNameToVerify detected"* ]]
+  [[ "$output" != *"generic deprecation"* ]]
+}
+
+@test "xray::extract_compat_warnings - reports generic deprecations when needed" {
+  run xray::extract_compat_warnings "Deprecated transport setting encountered"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"generic deprecation warnings"* ]]
+}
+
+@test "xray::generate_vless_encryption_pair - extracts decryption and encryption values" {
+  local mock_bin="${TEST_TMPDIR}/mock-xray-vlessenc"
+  cat > "${mock_bin}" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "vlessenc" ]]; then
+  cat <<'JSON'
+{"decryption":"decryption-token","encryption":"encryption-token"}
+JSON
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "${mock_bin}"
+
+  run xray::generate_vless_encryption_pair "${mock_bin}"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == $'decryption-token\nencryption-token' ]]
+}
+
+@test "xray::generate_vless_encryption_pair - fails when output is incomplete" {
+  local mock_bin="${TEST_TMPDIR}/mock-xray-vlessenc-bad"
+  cat > "${mock_bin}" <<'EOF'
+#!/usr/bin/env bash
+if [[ "${1:-}" == "vlessenc" ]]; then
+  echo '{"decryption":"only-one-value"}'
+  exit 0
+fi
+exit 1
+EOF
+  chmod +x "${mock_bin}"
+
+  run xray::generate_vless_encryption_pair "${mock_bin}"
+
+  [ "$status" -eq 1 ]
+}
