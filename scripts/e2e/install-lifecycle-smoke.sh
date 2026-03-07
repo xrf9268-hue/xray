@@ -52,9 +52,18 @@ ensure_smoke_mode() {
   esac
 
   if [[ "${SMOKE_MODE}" == "online" ]]; then
-    [[ -n "${ONLINE_INSTALL_URL}" ]] || { log "XRF_SMOKE_INSTALL_URL is required in online mode"; exit 1; }
-    [[ -n "${ONLINE_UNINSTALL_URL}" ]] || { log "XRF_SMOKE_UNINSTALL_URL is required in online mode"; exit 1; }
-    [[ -n "${ONLINE_BRANCH}" ]] || { log "XRF_SMOKE_BRANCH is required in online mode"; exit 1; }
+    [[ -n "${ONLINE_INSTALL_URL}" ]] || {
+      log "XRF_SMOKE_INSTALL_URL is required in online mode"
+      exit 1
+    }
+    [[ -n "${ONLINE_UNINSTALL_URL}" ]] || {
+      log "XRF_SMOKE_UNINSTALL_URL is required in online mode"
+      exit 1
+    }
+    [[ -n "${ONLINE_BRANCH}" ]] || {
+      log "XRF_SMOKE_BRANCH is required in online mode"
+      exit 1
+    }
   fi
 }
 
