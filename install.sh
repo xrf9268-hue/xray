@@ -23,6 +23,7 @@ VERSION=""
 PLUGINS=""
 DEBUG=""
 PROXY=""
+XRF_YES="false"
 ALLOW_UNSIGNED_TAG="${XRF_ALLOW_UNSIGNED_TAG:-false}"
 EXPECTED_COMMIT=""
 DOWNLOAD_COMMIT=""
@@ -250,6 +251,7 @@ args::init() {
   VERSION="latest"
   PLUGINS=""
   DEBUG="false"
+  XRF_YES="false"
   ALLOW_UNSIGNED_TAG="${XRF_ALLOW_UNSIGNED_TAG:-false}"
 }
 
@@ -290,6 +292,10 @@ args::parse() {
         ;;
       --debug)
         DEBUG="true"
+        shift
+        ;;
+      --yes|-y)
+        XRF_YES="true"
         shift
         ;;
       --help|-h)
@@ -425,6 +431,7 @@ Options:
   --proxy <url>                 Use proxy for downloads
   --install-dir <path>          Installation directory (default: /usr/local/xray-fusion)
   --allow-unsigned-release      Skip required GPG verification for tagged releases
+  --yes, -y                     Auto-confirm installation (skip prompt)
   --debug                       Enable debug output
   --help, -h                    Show this help
 
@@ -437,6 +444,9 @@ Examples:
 
   # Specific version
   curl -sL install.sh | bash -s -- --topology reality-only --version v1.8.1
+
+  # Non-interactive installation
+  curl -sL install.sh | bash -s -- --topology reality-only --yes
 
 Environment Variables:
   XRF_REPO_URL      Repository URL (default: https://github.com/xrf9268-hue/xray.git)
@@ -672,7 +682,7 @@ fetch_expected_commit() {
       return 1
     fi
 
-    EXPECTED_COMMIT="$(echo "${response}" | grep -m1 -oE '\"sha\"\\s*:\\s*\"[0-9a-f]{40}\"' | head -1 | grep -oE '[0-9a-f]{40}' || true)"
+    EXPECTED_COMMIT="$(echo "${response}" | grep -m1 -oE '"sha"[[:space:]]*:[[:space:]]*"[0-9a-f]{40}"' | head -1 | grep -oE '[0-9a-f]{40}' || true)"
     if [[ "${EXPECTED_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
       break
     fi
@@ -962,6 +972,10 @@ run_xray_install() {
 
   if [[ "${DEBUG}" == "true" ]]; then
     install_args+=("--debug")
+  fi
+
+  if [[ "${XRF_YES}" == "true" ]]; then
+    install_args+=("--yes")
   fi
 
   # Change to installation directory
