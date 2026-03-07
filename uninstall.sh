@@ -264,7 +264,9 @@ cleanup_symlinks() {
       target="$(readlink "${link_path}" 2> /dev/null || true)"
       # Remove if target contains xray-fusion or if target doesn't exist
       if [[ "${target}" == *"xray-fusion"* ]] || [[ ! -e "${target}" ]]; then
-        rm -f "${link_path}" && ((cleanup_count++))
+        if rm -f "${link_path}"; then
+          cleanup_count=$((cleanup_count + 1))
+        fi
         log_debug "Removed symlink: ${link_path}"
       fi
     fi
@@ -281,20 +283,26 @@ manual_cleanup() {
 
   # Remove global xrf symlink
   if [[ -L /usr/local/bin/xrf ]]; then
-    rm -f /usr/local/bin/xrf && ((cleanup_count++))
+    if rm -f /usr/local/bin/xrf; then
+      cleanup_count=$((cleanup_count + 1))
+    fi
     log_debug "Removed /usr/local/bin/xrf"
   fi
 
   # Remove Xray binary
   if [[ -f /usr/local/bin/xray ]]; then
-    rm -f /usr/local/bin/xray && ((cleanup_count++))
+    if rm -f /usr/local/bin/xray; then
+      cleanup_count=$((cleanup_count + 1))
+    fi
     log_debug "Removed /usr/local/bin/xray"
   fi
 
   # Remove Xray configuration (unless keeping config)
   if [[ "${KEEP_CONFIG}" != "true" ]]; then
     if [[ -d /usr/local/etc/xray ]]; then
-      rm -rf /usr/local/etc/xray && ((cleanup_count++))
+      if rm -rf /usr/local/etc/xray; then
+        cleanup_count=$((cleanup_count + 1))
+      fi
       log_debug "Removed /usr/local/etc/xray"
     fi
   else
@@ -303,13 +311,17 @@ manual_cleanup() {
 
   # Remove log directory
   if [[ -d /var/log/xray ]]; then
-    rm -rf /var/log/xray && ((cleanup_count++))
+    if rm -rf /var/log/xray; then
+      cleanup_count=$((cleanup_count + 1))
+    fi
     log_debug "Removed /var/log/xray"
   fi
 
   # Remove logrotate configuration
   if [[ -f /etc/logrotate.d/xray-fusion ]]; then
-    rm -f /etc/logrotate.d/xray-fusion && ((cleanup_count++))
+    if rm -f /etc/logrotate.d/xray-fusion; then
+      cleanup_count=$((cleanup_count + 1))
+    fi
     log_debug "Removed logrotate configuration"
   fi
 
