@@ -121,31 +121,44 @@ BASH
     REPO_URL="https://github.com/xrf9268-hue/xray.git"
     BRANCH="main"
 
+    mockbin="$(mktemp -d)"
+    trap '"'"'rm -rf "${mockbin}"'"'"' EXIT
+
     # Track call count via temp file
-    CALL_COUNT_FILE="$(mktemp)"
+    CALL_COUNT_FILE="${mockbin}/curl.calls"
     echo "0" > "${CALL_COUNT_FILE}"
 
-    # Mock curl to fail first time, succeed second time
-    curl() {
-      local count
-      count=$(cat "${CALL_COUNT_FILE}")
-      count=$((count + 1))
-      echo "${count}" > "${CALL_COUNT_FILE}"
-      if [[ ${count} -lt 2 ]]; then
-        return 1
-      fi
-      echo "{\"sha\": \"1234567890abcdef1234567890abcdef12345678\"}"
-      return 0
-    }
-    export -f curl
+    cat > "${mockbin}/curl" <<'"'"'EOF'"'"'
+#!/usr/bin/env bash
+set -euo pipefail
+count_file="__COUNT_FILE__"
+count="$(cat "${count_file}")"
+count=$((count + 1))
+printf "%s" "${count}" > "${count_file}"
+if [[ "${count}" -lt 2 ]]; then
+  exit 1
+fi
+printf "{\"sha\": \"1234567890abcdef1234567890abcdef12345678\"}"
+EOF
+    sed -i "s|__COUNT_FILE__|${CALL_COUNT_FILE}|" "${mockbin}/curl"
+    chmod +x "${mockbin}/curl"
 
-    # Override sleep to avoid delays in tests
-    sleep() { true; }
-    export -f sleep
+    cat > "${mockbin}/git" <<'"'"'EOF'"'"'
+#!/usr/bin/env bash
+exit 99
+EOF
+    chmod +x "${mockbin}/git"
+
+    cat > "${mockbin}/sleep" <<'"'"'EOF'"'"'
+#!/usr/bin/env bash
+exit 0
+EOF
+    chmod +x "${mockbin}/sleep"
+
+    PATH="${mockbin}:${PATH}"
 
     fetch_expected_commit
     echo "${EXPECTED_COMMIT}"
-    rm -f "${CALL_COUNT_FILE}"
   '
   [ "$status" -eq 0 ]
   [[ "${output}" =~ "1234567890abcdef1234567890abcdef12345678" ]]
