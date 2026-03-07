@@ -183,15 +183,29 @@ install_gh() {
 
   # Strip leading 'v' for download URL path
   local ver="${gh_version#v}"
-  echo "[SessionStart] Installing gh ${gh_version} (latest)..." >&2
+
+  # Detect host architecture for correct binary
+  local arch
+  case "$(uname -m)" in
+    x86_64) arch="amd64" ;;
+    aarch64 | arm64) arch="arm64" ;;
+    armv6*) arch="armv6" ;;
+    i386 | i686) arch="386" ;;
+    *)
+      echo "[SessionStart] Unsupported architecture: $(uname -m)" >&2
+      return 1
+      ;;
+  esac
+
+  echo "[SessionStart] Installing gh ${gh_version} (latest, linux/${arch})..." >&2
 
   local tmp_dir="/tmp/gh-$$"
   mkdir -p "${tmp_dir}"
 
   if curl -fsSL -o "${tmp_dir}/gh.tar.gz" \
-    "https://github.com/cli/cli/releases/download/${gh_version}/gh_${ver}_linux_amd64.tar.gz"; then
+    "https://github.com/cli/cli/releases/download/${gh_version}/gh_${ver}_linux_${arch}.tar.gz"; then
     tar -xzf "${tmp_dir}/gh.tar.gz" -C "${tmp_dir}"
-    mv "${tmp_dir}/gh_${ver}_linux_amd64/bin/gh" "${target}"
+    mv "${tmp_dir}/gh_${ver}_linux_${arch}/bin/gh" "${target}"
     chmod +x "${target}"
     rm -rf "${tmp_dir}"
     echo "[SessionStart] gh ${gh_version} installed successfully" >&2
