@@ -60,6 +60,8 @@ xrf uninstall
 |----------|-------------|
 | [TROUBLESHOOTING.md](TROUBLESHOOTING.md) | Common issues and solutions |
 | [docs/advanced.md](docs/advanced.md) | Advanced configuration |
+| [docs/development-environments.md](docs/development-environments.md) | Host shell and optional thin-devbox-shell workflow |
+| [docs/agent-session-template.md](docs/agent-session-template.md) | Portable Codex / agent startup template |
 | [docs/adr/](docs/adr/) | Architecture decisions |
 
 ## License
