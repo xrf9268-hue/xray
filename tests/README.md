@@ -36,6 +36,8 @@ sudo ./install.sh /usr/local
 
 For real shell coverage commands (`make coverage-unit-real`), install `kcov` too.
 On Ubuntu, if `kcov` reports missing shared libs, install `libbinutils libdw1 libelf1`.
+`bats-core` also requires a readable `/dev/fd/0`; on minimal Linux containers,
+restore it with `sudo ln -sf /proc/self/fd /dev/fd` before running `make test-unit`.
 
 ## Running Tests
 
@@ -54,6 +56,19 @@ bats -t tests/unit/*.bats
 
 # Run in parallel
 bats -j 4 tests/unit/*.bats
+
+# Fail fast if the bats runtime is incomplete
+make check-bats-runtime
+
+# Workspace-backed Docker lifecycle smoke test
+bash scripts/e2e/install-lifecycle-smoke.sh
+
+# Raw GitHub online installer lifecycle smoke test (requires pushed branch)
+XRF_SMOKE_MODE=online \
+XRF_SMOKE_BRANCH=<branch> \
+XRF_SMOKE_INSTALL_URL="https://raw.githubusercontent.com/xrf9268-hue/xray/<branch>/install.sh" \
+XRF_SMOKE_UNINSTALL_URL="https://raw.githubusercontent.com/xrf9268-hue/xray/<branch>/uninstall.sh" \
+bash scripts/e2e/install-lifecycle-smoke.sh
 ```
 
 ## Writing Tests

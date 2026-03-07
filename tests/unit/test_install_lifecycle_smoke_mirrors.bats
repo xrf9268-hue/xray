@@ -24,6 +24,17 @@ has_http_fallback_mirror() {
   smoke_mirror_block | grep -Eq '"http://mirrors\.[^"]+"'
 }
 
+has_resolved_xray_version_install() {
+  local script="${PROJECT_ROOT}/scripts/e2e/install-lifecycle-smoke.sh"
+  grep -q "resolve_smoke_xray_version" "${script}" &&
+    grep -Eq -- '--version .*SMOKE_XRAY_VERSION' "${script}"
+}
+
+has_online_pipefail_guard() {
+  local script="${PROJECT_ROOT}/scripts/e2e/install-lifecycle-smoke.sh"
+  grep -q "set -o pipefail; export XRF_REPO_URL" "${script}"
+}
+
 @test "install lifecycle smoke mirror fallbacks include HTTPS mirrors" {
   run has_https_fallback_mirror
   [ "${status}" -eq 0 ]
@@ -31,5 +42,17 @@ has_http_fallback_mirror() {
 
 @test "install lifecycle smoke mirror fallbacks include HTTP mirrors" {
   run has_http_fallback_mirror
+  [ "${status}" -eq 0 ]
+}
+
+@test "install lifecycle smoke installs with a resolved xray version" {
+  run has_resolved_xray_version_install
+
+  [ "${status}" -eq 0 ]
+}
+
+@test "install lifecycle smoke online curl pipelines enable pipefail" {
+  run has_online_pipefail_guard
+
   [ "${status}" -eq 0 ]
 }

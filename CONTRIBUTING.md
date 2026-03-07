@@ -33,6 +33,7 @@ Thank you for your interest in contributing to xray-fusion! This document provid
 - shfmt for code formatting
 - bats-core for testing
 - kcov for real shell coverage (Linux may also require `libbinutils libdw1 libelf1`)
+- A readable `/dev/fd` (required by bats-core process substitution)
 
 ### Development Environment Setup
 
@@ -53,6 +54,7 @@ shellcheck --version
 shfmt -version
 bats --version
 kcov --version
+test -r /dev/fd/0 || sudo ln -sf /proc/self/fd /dev/fd
 ```
 
 ### Running Tests
@@ -73,6 +75,10 @@ make lint
 # Format code
 make fmt
 ```
+
+If `make test-unit` fails before running any tests with a `/dev/fd/...` error, your
+environment is missing the file-descriptor filesystem that bats-core expects.
+On Linux, restore it with `sudo ln -sf /proc/self/fd /dev/fd`.
 
 ---
 
