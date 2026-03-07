@@ -159,10 +159,55 @@ install_bats_core() {
 
 install_bats_core
 
+# Install GitHub CLI (gh) - official precompiled binary
+# Ref: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
+# Using official binary release (not Ubuntu community package which has API compat issues)
+install_gh() {
+  local gh_version="2.67.0"
+  local target="${HOME}/.local/bin/gh"
+
+  # Skip if already installed
+  if command -v gh > /dev/null 2>&1; then
+    echo "[SessionStart] gh already installed ($(gh --version 2>&1 | head -1 || echo 'unknown'))" >&2
+    return 0
+  fi
+
+  echo "[SessionStart] Installing gh v${gh_version}..." >&2
+
+  local tmp_dir="/tmp/gh-$$"
+  mkdir -p "${tmp_dir}"
+
+  if curl -fsSL -o "${tmp_dir}/gh.tar.gz" \
+    "https://github.com/cli/cli/releases/download/v${gh_version}/gh_${gh_version}_linux_amd64.tar.gz"; then
+    tar -xzf "${tmp_dir}/gh.tar.gz" -C "${tmp_dir}"
+    mv "${tmp_dir}/gh_${gh_version}_linux_amd64/bin/gh" "${target}"
+    chmod +x "${target}"
+    rm -rf "${tmp_dir}"
+    echo "[SessionStart] gh v${gh_version} installed successfully" >&2
+
+    # Auto-authenticate if GH_TOKEN or GITHUB_TOKEN is available
+    if gh auth status > /dev/null 2>&1; then
+      echo "[SessionStart] gh already authenticated" >&2
+    elif [[ -n "${GH_TOKEN:-}" ]] || [[ -n "${GITHUB_TOKEN:-}" ]]; then
+      echo "[SessionStart] gh authenticated via environment token" >&2
+    else
+      echo "[SessionStart] gh installed but no token found for authentication" >&2
+    fi
+    return 0
+  else
+    echo "[SessionStart] Failed to install gh" >&2
+    rm -rf "${tmp_dir}"
+    return 1
+  fi
+}
+
+install_gh
+
 # Verify installations
 echo "[SessionStart] Development tools ready:" >&2
 command -v shfmt > /dev/null 2>&1 && echo "  ✓ shfmt $(shfmt --version)" >&2
 command -v shellcheck > /dev/null 2>&1 && echo "  ✓ shellcheck $(shellcheck --version | head -1)" >&2
 command -v bats > /dev/null 2>&1 && echo "  ✓ bats $(bats --version)" >&2
+command -v gh > /dev/null 2>&1 && echo "  ✓ gh $(gh --version 2>&1 | head -1)" >&2
 
 echo "[SessionStart] Environment initialized successfully" >&2
