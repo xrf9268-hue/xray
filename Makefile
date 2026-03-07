@@ -8,7 +8,7 @@ SRC_LINT := $(shell git ls-files '*.sh' 'bin/*' 'commands/*' 'lib/*' 'modules/**
 SRC_FMT  := $(shell git ls-files '*.sh' 'bin/*' 'commands/*' 'lib/*' 'modules/**/*' 'services/**/*' 'plugins/**/*.sh' 'scripts/**/*.sh' 'tests/**/*.sh' 2>/dev/null)
 COVERAGE_DIR ?= artifacts/coverage
 
-.PHONY: lint fmt test test-unit test-integration coverage-check-tools coverage-unit-real coverage-integration-real coverage-real
+.PHONY: lint fmt test check-bats-runtime test-unit test-integration coverage-check-tools coverage-unit-real coverage-integration-real coverage-real
 
 lint:
 	@files=(); \
@@ -30,15 +30,18 @@ fmt:
 
 test: test-unit test-integration
 
-test-unit:
+check-bats-runtime:
+	@bash scripts/ci/check-bats-runtime.sh
+
+test-unit: check-bats-runtime
 	@command -v bats >/dev/null 2>&1 || { echo "bats not found; see https://github.com/bats-core/bats-core"; exit 2; }
 	@bats tests/unit/*.bats
 
-test-integration:
+test-integration: check-bats-runtime
 	@command -v bats >/dev/null 2>&1 || { echo "bats not found; see https://github.com/bats-core/bats-core"; exit 2; }
 	@bats tests/integration/*.bats
 
-coverage-check-tools:
+coverage-check-tools: check-bats-runtime
 	@command -v bats >/dev/null 2>&1 || { echo "bats not found; see https://github.com/bats-core/bats-core"; exit 2; }
 	@command -v jq >/dev/null 2>&1 || { echo "jq not found; install jq to run coverage tests."; exit 2; }
 	@command -v kcov >/dev/null 2>&1 || { echo "kcov not found; see https://github.com/SimonKagstrom/kcov"; exit 2; }
