@@ -163,7 +163,6 @@ install_bats_core
 # Ref: https://github.com/cli/cli/blob/trunk/docs/install_linux.md
 # Using official binary release (not Ubuntu community package which has API compat issues)
 install_gh() {
-  local gh_version="2.67.0"
   local target="${HOME}/.local/bin/gh"
 
   # Skip if already installed
@@ -172,18 +171,30 @@ install_gh() {
     return 0
   fi
 
-  echo "[SessionStart] Installing gh v${gh_version}..." >&2
+  # Fetch latest version tag from GitHub API
+  local gh_version
+  gh_version="$(curl -fsSL https://api.github.com/repos/cli/cli/releases/latest \
+    | grep -o '"tag_name":\s*"v[^"]*"' | head -1 | grep -o 'v[^"]*')"
+
+  if [[ -z "${gh_version}" ]]; then
+    echo "[SessionStart] Failed to determine latest gh version" >&2
+    return 1
+  fi
+
+  # Strip leading 'v' for download URL path
+  local ver="${gh_version#v}"
+  echo "[SessionStart] Installing gh ${gh_version} (latest)..." >&2
 
   local tmp_dir="/tmp/gh-$$"
   mkdir -p "${tmp_dir}"
 
   if curl -fsSL -o "${tmp_dir}/gh.tar.gz" \
-    "https://github.com/cli/cli/releases/download/v${gh_version}/gh_${gh_version}_linux_amd64.tar.gz"; then
+    "https://github.com/cli/cli/releases/download/${gh_version}/gh_${ver}_linux_amd64.tar.gz"; then
     tar -xzf "${tmp_dir}/gh.tar.gz" -C "${tmp_dir}"
-    mv "${tmp_dir}/gh_${gh_version}_linux_amd64/bin/gh" "${target}"
+    mv "${tmp_dir}/gh_${ver}_linux_amd64/bin/gh" "${target}"
     chmod +x "${target}"
     rm -rf "${tmp_dir}"
-    echo "[SessionStart] gh v${gh_version} installed successfully" >&2
+    echo "[SessionStart] gh ${gh_version} installed successfully" >&2
 
     # Auto-authenticate if GH_TOKEN or GITHUB_TOKEN is available
     if gh auth status > /dev/null 2>&1; then
