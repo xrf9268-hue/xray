@@ -22,12 +22,38 @@ teardown() {
   [ "${output}" = "true|true|true|true" ]
 }
 
+@test "uninstall.sh - cleanup returns success when TMP_DIR is unset" {
+  run bash -lc '
+    source "'"${PROJECT_ROOT}"'/uninstall.sh"
+    unset TMP_DIR
+
+    cleanup
+  '
+
+  [ "${status}" -eq 0 ]
+}
+
+@test "uninstall.sh - cleanup removes temporary directory when present" {
+  local tmp_dir="${TEST_TMPDIR}/uninstall-tmp"
+  mkdir -p "${tmp_dir}"
+
+  run bash -lc '
+    source "'"${PROJECT_ROOT}"'/uninstall.sh"
+    TMP_DIR="'"${tmp_dir}"'"
+
+    cleanup
+  '
+
+  [ "${status}" -eq 0 ]
+  [ ! -d "${tmp_dir}" ]
+}
+
 @test "uninstall.sh - check_installation fails in non-interactive mode without --force" {
   run bash -lc '
     source "'"${PROJECT_ROOT}"'/uninstall.sh"
     empty_bin="$(mktemp -d)"
-    trap '"'"'rm -rf "${empty_bin}"'"'"' EXIT
-    PATH="${empty_bin}"
+    trap '"'"'/bin/rm -rf "${empty_bin}"'"'"' EXIT
+    PATH="${empty_bin}:/bin:/usr/bin"
     INSTALL_DIR="'"${TEST_TMPDIR}"'/missing-install"
     FORCE=""
 
@@ -42,8 +68,8 @@ teardown() {
   run bash -lc '
     source "'"${PROJECT_ROOT}"'/uninstall.sh"
     empty_bin="$(mktemp -d)"
-    trap '"'"'rm -rf "${empty_bin}"'"'"' EXIT
-    PATH="${empty_bin}"
+    trap '"'"'/bin/rm -rf "${empty_bin}"'"'"' EXIT
+    PATH="${empty_bin}:/bin:/usr/bin"
     INSTALL_DIR="'"${TEST_TMPDIR}"'/missing-install"
     FORCE="true"
 
