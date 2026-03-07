@@ -187,7 +187,7 @@ run_install_command() {
   fi
 
   if [[ "${SMOKE_MODE}" == "online" ]]; then
-    run_in_container "export XRF_REPO_URL='${ONLINE_REPO_URL}' XRF_BRANCH='${ONLINE_BRANCH}'; curl -fsSL '${ONLINE_INSTALL_URL}' | bash -s --${argstr} > '${logfile}' 2>&1"
+    run_in_container "set -o pipefail; export XRF_REPO_URL='${ONLINE_REPO_URL}' XRF_BRANCH='${ONLINE_BRANCH}'; curl -fsSL '${ONLINE_INSTALL_URL}' | bash -s --${argstr} > '${logfile}' 2>&1"
     return 0
   fi
 
@@ -205,7 +205,7 @@ run_uninstall_command() {
   fi
 
   if [[ "${SMOKE_MODE}" == "online" ]]; then
-    run_in_container "export XRF_REPO_URL='${ONLINE_REPO_URL}' XRF_BRANCH='${ONLINE_BRANCH}'; curl -fsSL '${ONLINE_UNINSTALL_URL}' | bash -s --${argstr} > '${logfile}' 2>&1"
+    run_in_container "set -o pipefail; export XRF_REPO_URL='${ONLINE_REPO_URL}' XRF_BRANCH='${ONLINE_BRANCH}'; curl -fsSL '${ONLINE_UNINSTALL_URL}' | bash -s --${argstr} > '${logfile}' 2>&1"
     return 0
   fi
 

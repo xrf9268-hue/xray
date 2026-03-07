@@ -30,6 +30,11 @@ has_resolved_xray_version_install() {
     grep -Eq -- '--version .*SMOKE_XRAY_VERSION' "${script}"
 }
 
+has_online_pipefail_guard() {
+  local script="${PROJECT_ROOT}/scripts/e2e/install-lifecycle-smoke.sh"
+  grep -q "set -o pipefail; export XRF_REPO_URL" "${script}"
+}
+
 @test "install lifecycle smoke mirror fallbacks include HTTPS mirrors" {
   run has_https_fallback_mirror
   [ "${status}" -eq 0 ]
@@ -42,6 +47,12 @@ has_resolved_xray_version_install() {
 
 @test "install lifecycle smoke installs with a resolved xray version" {
   run has_resolved_xray_version_install
+
+  [ "${status}" -eq 0 ]
+}
+
+@test "install lifecycle smoke online curl pipelines enable pipefail" {
+  run has_online_pipefail_guard
 
   [ "${status}" -eq 0 ]
 }
