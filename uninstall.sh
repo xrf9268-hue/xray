@@ -443,4 +443,6 @@ EOF
 }
 
 # Run main function with all arguments
-main "${@}"
+if [[ -z "${BASH_SOURCE[0]:-}" ]] || [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+  main "${@}"
+fi

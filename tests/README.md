@@ -54,6 +54,16 @@ bats -t tests/unit/*.bats
 
 # Run in parallel
 bats -j 4 tests/unit/*.bats
+
+# Workspace-backed Docker lifecycle smoke test
+bash scripts/e2e/install-lifecycle-smoke.sh
+
+# Raw GitHub online installer lifecycle smoke test (requires pushed branch)
+XRF_SMOKE_MODE=online \
+XRF_SMOKE_BRANCH=<branch> \
+XRF_SMOKE_INSTALL_URL="https://raw.githubusercontent.com/xrf9268-hue/xray/<branch>/install.sh" \
+XRF_SMOKE_UNINSTALL_URL="https://raw.githubusercontent.com/xrf9268-hue/xray/<branch>/uninstall.sh" \
+bash scripts/e2e/install-lifecycle-smoke.sh
 ```
 
 ## Writing Tests
