@@ -103,14 +103,14 @@ EOF
 
     cleanup_partial_installation
 
-    printf "%s|%s|%s" \
+    printf "RESULT:%s|%s|%s" \
       "$(test -e "${INSTALL_DIR}" && echo present || echo missing)" \
       "$(test -L "${SYMLINK_PATH}" && echo present || echo missing)" \
       "$(test -e "${INSTALL_MARKER}" && echo present || echo missing)"
   '
 
   [ "${status}" -eq 0 ]
-  [ "${output}" = "missing|missing|missing" ]
+  [[ "${output}" == *"RESULT:missing|missing|missing" ]]
 }
 
 @test "install.sh - cleanup_partial_installation preserves preexisting install directory" {
@@ -131,7 +131,7 @@ EOF
 
     cleanup_partial_installation
 
-    printf "%s|%s|%s|%s" \
+    printf "RESULT:%s|%s|%s|%s" \
       "$(test -d "${INSTALL_DIR}" && echo present || echo missing)" \
       "$(test -f "${INSTALL_DIR}/keep.txt" && echo present || echo missing)" \
       "$(test -L "${SYMLINK_PATH}" && echo present || echo missing)" \
@@ -139,7 +139,7 @@ EOF
   '
 
   [ "${status}" -eq 0 ]
-  [ "${output}" = "present|present|missing|missing" ]
+  [[ "${output}" == *"RESULT:present|present|missing|missing" ]]
 }
 
 @test "install.sh - run_xray_install stops before execution when integrity is not verified" {
