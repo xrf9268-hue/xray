@@ -219,6 +219,12 @@ my_function() {
 make fmt && make lint && make test-unit
 ```
 
+## Push and CI
+
+- After every push or PR update, monitor GitHub Actions for the pushed commit until all required checks complete.
+- If any required check fails, investigate the failure, make the necessary fix, rerun relevant local validation, and push follow-up commits until the required checks pass.
+- Do not stop at reporting CI failures unless the user explicitly asks to pause.
+
 ## Plugin System
 
 ### Metadata (Required)
