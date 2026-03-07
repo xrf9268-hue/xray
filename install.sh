@@ -651,18 +651,49 @@ fetch_expected_commit() {
   local response=""
   log_info "Fetching expected commit from GitHub API (${BRANCH})"
 
-  if command -v curl > /dev/null 2>&1; then
-    response="$(curl -fsSL "${api_url}" 2> /dev/null || true)"
-  elif command -v wget > /dev/null 2>&1; then
-    response="$(wget -qO- "${api_url}" 2> /dev/null || true)"
-  else
-    log_error "No HTTP client available to fetch expected commit (need curl or wget)"
-    return 1
+  # Try GitHub API with retries (3 attempts, exponential backoff)
+  local attempt=0
+  local max_retries=3
+  local delay=2
+  while [[ ${attempt} -lt ${max_retries} ]]; do
+    attempt=$((attempt + 1))
+    log_debug "GitHub API attempt ${attempt}/${max_retries}"
+
+    if command -v curl > /dev/null 2>&1; then
+      response="$(curl -fsSL --connect-timeout 10 --max-time 30 \
+        -H "Accept: application/vnd.github.v3+json" \
+        "${api_url}" 2> /dev/null || true)"
+    elif command -v wget > /dev/null 2>&1; then
+      response="$(wget -qO- --timeout=30 \
+        --header="Accept: application/vnd.github.v3+json" \
+        "${api_url}" 2> /dev/null || true)"
+    else
+      log_error "No HTTP client available to fetch expected commit (need curl or wget)"
+      return 1
+    fi
+
+    EXPECTED_COMMIT="$(echo "${response}" | grep -m1 -oE '\"sha\"\\s*:\\s*\"[0-9a-f]{40}\"' | head -1 | grep -oE '[0-9a-f]{40}' || true)"
+    if [[ "${EXPECTED_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+      break
+    fi
+
+    if [[ ${attempt} -lt ${max_retries} ]]; then
+      log_warn "GitHub API attempt ${attempt} failed, retrying in ${delay}s..."
+      sleep "${delay}"
+      delay=$((delay * 2))
+    fi
+  done
+
+  # Fallback to git ls-remote if API failed
+  if [[ ! "${EXPECTED_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
+    log_warn "GitHub API failed after ${max_retries} attempts, trying git ls-remote..."
+    if command -v git > /dev/null 2>&1; then
+      EXPECTED_COMMIT="$(git ls-remote "${REPO_URL}" "refs/heads/${BRANCH}" 2> /dev/null | awk '{print $1}' || true)"
+    fi
   fi
 
-  EXPECTED_COMMIT="$(echo "${response}" | grep -m1 -oE '\"sha\"\\s*:\\s*\"[0-9a-f]{40}\"' | head -1 | grep -oE '[0-9a-f]{40}' || true)"
   if [[ ! "${EXPECTED_COMMIT}" =~ ^[0-9a-f]{40}$ ]]; then
-    log_error "Failed to determine expected commit from GitHub API"
+    log_error "Failed to determine expected commit from GitHub API and git ls-remote"
     log_error "Set XRF_EXPECTED_COMMIT manually to continue after verifying the correct hash"
     return 1
   fi
