@@ -223,6 +223,8 @@ make fmt && make lint && make test-unit
 
 - After every push or PR update, monitor GitHub Actions for the pushed commit until all required checks complete.
 - If any required check fails, investigate the failure, make the necessary fix, rerun relevant local validation, and push follow-up commits until the required checks pass.
+- After every push or PR update, also review new PR reviews, review comments, and bot suggestions for the pushed commit.
+- Treat actionable review findings as required follow-up work: validate whether they still apply on `HEAD`, fix or respond with evidence, rerun relevant local validation, and push follow-up commits until there is no unresolved blocking review feedback.
 - Do not stop at reporting CI failures unless the user explicitly asks to pause.
 
 ## Plugin System
