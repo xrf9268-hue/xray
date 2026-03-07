@@ -231,7 +231,9 @@ jobs:
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
         uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306
         with:
-          path: /usr/local/bin/kcov
+          # Cache in user-writable directory to avoid tar permission errors
+          # when restoring to root-owned /usr/local/bin (exit code 2).
+          path: ~/.local/bin/kcov
           key: kcov-v42-built-${{ runner.os }}-${{ runner.arch }}
 
       - name: Build kcov from source
@@ -246,6 +248,15 @@ jobs:
           make -j"$(nproc)"
           sudo make install
           rm -rf "${tmpdir}"
+          # Copy built binary to user-writable cache path
+          mkdir -p ~/.local/bin
+          cp /usr/local/bin/kcov ~/.local/bin/kcov
+
+      - name: Install kcov from cache
+        if: steps.cache-kcov.outputs.cache-hit == 'true'
+        run: |
+          sudo cp ~/.local/bin/kcov /usr/local/bin/kcov
+          sudo chmod +x /usr/local/bin/kcov
 
       - name: Verify kcov
         run: |
