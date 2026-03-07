@@ -16,12 +16,15 @@ Detailed patterns and conventions for xray-fusion development.
 - Use structured logging via `core::log`; do not add new plain `echo` logging in library/runtime paths.
 - Update tests and docs when behavior changes (especially `tests/README.md`, `CONTRIBUTING.md`, and relevant service docs).
 - Run verification commands relevant to the changed area before claiming completion.
+- Start new tasks from `origin/main` in a new git worktree and a `codex/*` branch unless the user explicitly asks to continue on the current branch.
+- Treat host shell workflows as the baseline. `thin-devbox-shell` is an optional execution layer, not a required prerequisite.
 
 ### Never
 
 - Do not add `trap ... EXIT` patterns in utility/library functions.
 - Do not bypass shellcheck/shfmt conventions for shell files.
 - Do not enable Docker proxy fallback in GitHub CI; local-only fallback is allowed (see Testing section).
+- Do not assume `devbox` is available or that Docker can be called from inside a `devbox` container.
 
 ## Change-Triggered Verification
 
@@ -41,6 +44,15 @@ Before opening a PR, prefer running full test suite when feasible:
 ```bash
 make test
 ```
+
+## Development Modes
+
+- Supported modes:
+  - Host shell on Linux/macOS
+  - Windows via WSL Linux filesystem
+  - Optional [`thin-devbox-shell`](https://github.com/xrf9268-hue/thin-devbox-shell) for a reproducible shell layer
+- Keep the project workflow environment-agnostic. Repository docs and prompts must still work when `devbox` is not used.
+- Run Docker lifecycle and online-install validation from fresh host Docker containers. Do not reuse prior test containers or assume Docker-in-Docker support.
 
 ## Key APIs
 

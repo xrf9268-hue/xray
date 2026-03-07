@@ -78,13 +78,29 @@ make fmt
 
 ## Development Workflow
 
+### Environment Options
+
+Use the host shell as the baseline workflow for this repository. Supported
+setups include:
+
+- Linux or macOS local shell
+- Windows via WSL
+- Optional [`thin-devbox-shell`](https://github.com/xrf9268-hue/thin-devbox-shell)
+  as a reproducible shell layer
+
+`thin-devbox-shell` is optional. Do not assume it is always present, and do not
+assume Docker can be called from inside the shared shell container. For Docker
+lifecycle and online-install validation, prefer fresh host Docker containers.
+Repository-local workflow docs in this repository remain authoritative even when
+you choose the shared shell for command execution.
+
 ### 1. Create a Feature Branch
 
 ```bash
-# Always work on a feature branch, never on main
-git checkout -b feature/your-feature-name
-# or
-git checkout -b fix/bug-description
+# Start from origin/main in a new worktree when another task is already active
+git fetch origin
+git worktree add -b codex/your-task-name ../xray-your-task-name origin/main
+cd ../xray-your-task-name
 ```
 
 ### 2. Make Changes
@@ -114,10 +130,14 @@ Follow the [Commit Guidelines](#commit-guidelines) section below.
 ### 5. Push and Create PR
 
 ```bash
-git push origin feature/your-feature-name
+git push origin codex/your-task-name
 ```
 
 Then create a pull request on GitHub.
+
+After each push or PR update, monitor GitHub Actions for the pushed commit until
+required checks finish. If a required check fails, fix the issue, rerun
+relevant local validation, and push again until the checks pass.
 
 ---
 
