@@ -21,6 +21,11 @@ setup() {
 
   # Create mock commands
   create_systemd_mocks
+
+  # Extract systemd::escape_sed_replacement from source (can't source
+  # the file directly because it has a case dispatch at the bottom)
+  eval "$(sed -n '/^systemd::escape_sed_replacement()/,/^}/p' \
+    "${PROJECT_ROOT}/services/xray/systemd-unit.sh")"
 }
 
 teardown() {
@@ -29,13 +34,13 @@ teardown() {
 
 create_systemd_mocks() {
   # Mock sudo - just pass through commands
-  cat > "${TEST_TMPDIR}/bin/sudo" <<'EOF'
+  cat > "${TEST_TMPDIR}/bin/sudo" << 'EOF'
 #!/usr/bin/env bash
 "$@"
 EOF
 
   # Mock systemctl with call tracking
-  cat > "${TEST_TMPDIR}/bin/systemctl" <<'SCRIPT'
+  cat > "${TEST_TMPDIR}/bin/systemctl" << 'SCRIPT'
 #!/usr/bin/env bash
 echo "$@" >> "${TEST_TMPDIR}/systemctl_calls"
 
@@ -62,7 +67,7 @@ esac
 SCRIPT
 
   # Mock getent for user module
-  cat > "${TEST_TMPDIR}/bin/getent" <<'EOF'
+  cat > "${TEST_TMPDIR}/bin/getent" << 'EOF'
 #!/usr/bin/env bash
 record="${TEST_TMPDIR}/${1}_${2}"
 if [[ -f "${record}" ]]; then
@@ -73,14 +78,14 @@ exit 2
 EOF
 
   # Mock groupadd
-  cat > "${TEST_TMPDIR}/bin/groupadd" <<'EOF'
+  cat > "${TEST_TMPDIR}/bin/groupadd" << 'EOF'
 #!/usr/bin/env bash
 group="${@: -1}"
 printf "%s:x:998:\n" "${group}" > "${TEST_TMPDIR}/group_${group}"
 EOF
 
   # Mock useradd
-  cat > "${TEST_TMPDIR}/bin/useradd" <<'EOF'
+  cat > "${TEST_TMPDIR}/bin/useradd" << 'EOF'
 #!/usr/bin/env bash
 user="${@: -1}"
 printf "%s:x:1000:998::/var/lib/%s:/usr/sbin/nologin\n" "${user}" "${user}" > "${TEST_TMPDIR}/passwd_${user}"
@@ -96,7 +101,7 @@ mock_path() {
 # Create a minimal xray.service file for testing in temp directory
 create_service_file() {
   mkdir -p "${TEST_TMPDIR}/packaging/systemd"
-  cat > "${TEST_TMPDIR}/packaging/systemd/xray.service" <<'EOF'
+  cat > "${TEST_TMPDIR}/packaging/systemd/xray.service" << 'EOF'
 [Unit]
 Description=Xray Service
 After=network.target
@@ -659,7 +664,7 @@ EOF
 
   [ "$status" -eq 0 ]
   local perms
-  perms=$(stat -c "%a" "${TEST_TMPDIR}/etc/systemd/system/xray.service" 2>/dev/null || stat -f "%Lp" "${TEST_TMPDIR}/etc/systemd/system/xray.service")
+  perms=$(stat -c "%a" "${TEST_TMPDIR}/etc/systemd/system/xray.service" 2> /dev/null || stat -f "%Lp" "${TEST_TMPDIR}/etc/systemd/system/xray.service")
   [[ "${perms}" == "644" ]]
 }
 
@@ -700,4 +705,44 @@ EOF
   grep -q "\[Unit\]" "${TEST_TMPDIR}/etc/systemd/system/xray.service"
   grep -q "\[Service\]" "${TEST_TMPDIR}/etc/systemd/system/xray.service"
   grep -q "\[Install\]" "${TEST_TMPDIR}/etc/systemd/system/xray.service"
+}
+
+# =============================================================================
+# systemd::escape_sed_replacement() tests
+# =============================================================================
+
+@test "systemd::escape_sed_replacement - escapes pipe character" {
+  run systemd::escape_sed_replacement "foo|bar"
+  [ "$status" -eq 0 ]
+  [ "$output" = 'foo\|bar' ]
+}
+
+@test "systemd::escape_sed_replacement - escapes ampersand" {
+  run systemd::escape_sed_replacement "foo&bar"
+  [ "$status" -eq 0 ]
+  [ "$output" = 'foo\&bar' ]
+}
+
+@test "systemd::escape_sed_replacement - escapes backslash" {
+  run systemd::escape_sed_replacement 'foo\bar'
+  [ "$status" -eq 0 ]
+  [ "$output" = 'foo\\bar' ]
+}
+
+@test "systemd::escape_sed_replacement - passes through normal paths" {
+  run systemd::escape_sed_replacement "/usr/local/bin/xray"
+  [ "$status" -eq 0 ]
+  [ "$output" = "/usr/local/bin/xray" ]
+}
+
+@test "systemd::escape_sed_replacement - handles empty string" {
+  run systemd::escape_sed_replacement ""
+  [ "$status" -eq 0 ]
+  [ "$output" = "" ]
+}
+
+@test "systemd::escape_sed_replacement - escapes multiple special chars" {
+  run systemd::escape_sed_replacement 'a|b&c\d'
+  [ "$status" -eq 0 ]
+  [ "$output" = 'a\|b\&c\\d' ]
 }
