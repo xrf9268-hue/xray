@@ -80,7 +80,7 @@ teardown() {
 }
 
 @test "check command --confdir passes custom path to validator" {
-  # Mock xray that reports the confdir it received
+  # Mock xray that echoes the confdir argument it received
   cat > "${XRF_PREFIX}/bin/xray" << 'MOCK'
 #!/usr/bin/env bash
 for arg in "$@"; do echo "$arg"; done
@@ -92,6 +92,8 @@ MOCK
   mkdir -p "${custom_dir}"
   run "${PROJECT_ROOT}/commands/check.sh" --confdir "${custom_dir}"
   [ "$status" -eq 0 ]
+  # Verify the custom path was actually forwarded to xray -test
+  [[ "$output" == *"${custom_dir}"* ]]
 }
 
 @test "check command --deep with empty confdir fails" {
