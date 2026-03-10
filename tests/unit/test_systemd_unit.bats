@@ -21,6 +21,11 @@ setup() {
 
   # Create mock commands
   create_systemd_mocks
+
+  # Extract systemd::escape_sed_replacement from source (can't source
+  # the file directly because it has a case dispatch at the bottom)
+  eval "$(sed -n '/^systemd::escape_sed_replacement()/,/^}/p' \
+    "${PROJECT_ROOT}/services/xray/systemd-unit.sh")"
 }
 
 teardown() {
@@ -707,43 +712,37 @@ EOF
 # =============================================================================
 
 @test "systemd::escape_sed_replacement - escapes pipe character" {
-  escape() { printf '%s' "${1}" | sed -e 's/[|&\\]/\\&/g'; }
-  run escape "foo|bar"
+  run systemd::escape_sed_replacement "foo|bar"
   [ "$status" -eq 0 ]
   [ "$output" = 'foo\|bar' ]
 }
 
 @test "systemd::escape_sed_replacement - escapes ampersand" {
-  escape() { printf '%s' "${1}" | sed -e 's/[|&\\]/\\&/g'; }
-  run escape "foo&bar"
+  run systemd::escape_sed_replacement "foo&bar"
   [ "$status" -eq 0 ]
   [ "$output" = 'foo\&bar' ]
 }
 
 @test "systemd::escape_sed_replacement - escapes backslash" {
-  escape() { printf '%s' "${1}" | sed -e 's/[|&\\]/\\&/g'; }
-  run escape 'foo\bar'
+  run systemd::escape_sed_replacement 'foo\bar'
   [ "$status" -eq 0 ]
   [ "$output" = 'foo\\bar' ]
 }
 
 @test "systemd::escape_sed_replacement - passes through normal paths" {
-  escape() { printf '%s' "${1}" | sed -e 's/[|&\\]/\\&/g'; }
-  run escape "/usr/local/bin/xray"
+  run systemd::escape_sed_replacement "/usr/local/bin/xray"
   [ "$status" -eq 0 ]
   [ "$output" = "/usr/local/bin/xray" ]
 }
 
 @test "systemd::escape_sed_replacement - handles empty string" {
-  escape() { printf '%s' "${1}" | sed -e 's/[|&\\]/\\&/g'; }
-  run escape ""
+  run systemd::escape_sed_replacement ""
   [ "$status" -eq 0 ]
   [ "$output" = "" ]
 }
 
 @test "systemd::escape_sed_replacement - escapes multiple special chars" {
-  escape() { printf '%s' "${1}" | sed -e 's/[|&\\]/\\&/g'; }
-  run escape 'a|b&c\d'
+  run systemd::escape_sed_replacement 'a|b&c\d'
   [ "$status" -eq 0 ]
   [ "$output" = 'a\|b\&c\\d' ]
 }

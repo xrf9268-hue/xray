@@ -109,20 +109,13 @@ teardown() {
 # === logrotate_obs::service_remove Tests ===
 
 @test "logrotate_obs::service_remove - removes existing logrotate config" {
-  # Create a fake logrotate file at the real expected path
-  local conf
-  conf="$(_logrotate_path)"
-  local conf_dir
-  conf_dir="$(dirname "${conf}")"
-  mkdir -p "${conf_dir}" 2> /dev/null || true
-  if touch "${conf}" 2> /dev/null; then
-    run logrotate_obs::service_remove
-    [ "$status" -eq 0 ]
-    [ ! -f "${conf}" ]
-  else
-    # Cannot write to /etc - test the function logic directly
-    skip "Cannot create test file at ${conf} (no write permission)"
-  fi
+  # Override _logrotate_path to use sandbox directory
+  local test_conf="${TEST_TMPDIR}/logrotate.d/xray-fusion"
+  mkdir -p "$(dirname "${test_conf}")"
+  touch "${test_conf}"
+  _logrotate_path() { echo "${TEST_TMPDIR}/logrotate.d/xray-fusion"; }
+  logrotate_obs::service_remove
+  [ ! -f "${test_conf}" ]
 }
 
 @test "logrotate_obs::service_remove - succeeds when config does not exist" {
