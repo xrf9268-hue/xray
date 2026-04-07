@@ -109,6 +109,18 @@ xray::extract_compat_warnings() {
   if [[ "${lower}" == *"deprecated"* && "${lower}" != *"allowinsecure"* && "${lower}" != *"verifypeercertinnames"* && "${lower}" != *"servernametoverify"* ]]; then
     printf '%s\n' 'Xray reported generic deprecation warnings; inspect xray -test output for migration guidance'
   fi
+
+  # v26.3.27+: REALITY non-443 port warning
+  if [[ "${lower}" == *"reality"* && "${lower}" == *"443"* ]] \
+    && [[ "${lower}" == *"warn"* || "${lower}" == *"not 443"* || "${lower}" == *"non-443"* ]]; then
+    printf '%s\n' 'Xray warns: REALITY on non-443 port may reduce stealth; port 443 is recommended'
+  fi
+
+  # v26.3.27+: Apple/iCloud destination warning
+  if [[ "${lower}" == *"apple"* || "${lower}" == *"icloud"* ]] \
+    && [[ "${lower}" == *"block"* || "${lower}" == *"warn"* || "${lower}" == *"risk"* ]]; then
+    printf '%s\n' 'Xray warns: Apple/iCloud REALITY destinations may cause IP blocking; choose a different target'
+  fi
 }
 
 ##

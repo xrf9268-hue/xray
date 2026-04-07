@@ -111,6 +111,14 @@ setup() {
       return "${ERR_INVALID_ARG}"
     fi
 
+    # Warn about Apple/iCloud REALITY destinations (v26.3.27+: risk of IP blocking)
+    case "${host}" in
+      *icloud-content.com | *cdn-apple.com | *mzstatic.com | *icloud.com | *apple.com)
+        core::log warn "Apple/iCloud REALITY dest may cause IP blocking (Xray v26.3.27+)" \
+          "$(printf '{"host":"%s","suggestion":"Use a non-Apple domain such as www.microsoft.com"}' "${host}")"
+        ;;
+    esac
+
     printf '%s:%s' "${host}" "${port}"
   }
 
@@ -248,7 +256,7 @@ line2" "test")"
 
 @test "json_array_from_csv populates first reference" {
   local first_value=""
-  json_array_from_csv "www.microsoft.com,www.apple.com" "XRAY_SNI" first_value >/dev/null
+  json_array_from_csv "www.microsoft.com,www.apple.com" "XRAY_SNI" first_value > /dev/null
   [ "${first_value}" = "www.microsoft.com" ]
 }
 
@@ -287,6 +295,21 @@ line2" "test")"
 @test "ensure_reality_dest rejects malicious input" {
   run ensure_reality_dest "bad\"host" "www.microsoft.com"
   [ "${status}" -ne 0 ]
+}
+
+@test "ensure_reality_dest warns for Apple/iCloud destinations" {
+  result="$(ensure_reality_dest "www.icloud.com:443" "www.microsoft.com")"
+  [ "${result}" = "www.icloud.com:443" ]
+}
+
+@test "ensure_reality_dest warns for cdn-apple.com destinations" {
+  result="$(ensure_reality_dest "cdn-apple.com" "www.microsoft.com")"
+  [ "${result}" = "cdn-apple.com:443" ]
+}
+
+@test "ensure_reality_dest does not warn for microsoft.com" {
+  result="$(ensure_reality_dest "www.microsoft.com:443" "www.microsoft.com")"
+  [ "${result}" = "www.microsoft.com:443" ]
 }
 
 # === build_shortids_pool Tests ===
@@ -415,7 +438,7 @@ line2" "test")"
 
   result="$(xray::prepare_release_dir)"
   # Directory should have 750 permissions
-  perms="$(stat -c '%a' "${result}" 2>/dev/null || stat -f '%Lp' "${result}")"
+  perms="$(stat -c '%a' "${result}" 2> /dev/null || stat -f '%Lp' "${result}")"
   [ "${perms}" = "750" ]
 }
 

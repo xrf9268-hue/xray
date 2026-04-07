@@ -377,7 +377,7 @@ teardown() {
 
 @test "xray::installed_version - falls back from -version to version command" {
   local mock_bin="${TEST_TMPDIR}/mock-xray"
-  cat > "${mock_bin}" <<'EOF'
+  cat > "${mock_bin}" << 'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "-version" ]]; then
   exit 1
@@ -397,7 +397,7 @@ EOF
 
 @test "xray::installed_version - uses -version output when it is parseable" {
   local mock_bin="${TEST_TMPDIR}/mock-xray-version"
-  cat > "${mock_bin}" <<'EOF'
+  cat > "${mock_bin}" << 'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "-version" ]]; then
   echo "Xray 27.0.1 (mock build)"
@@ -432,9 +432,39 @@ EOF
   [[ "$output" == *"generic deprecation warnings"* ]]
 }
 
+@test "xray::extract_compat_warnings - detects REALITY non-443 port warning" {
+  run xray::extract_compat_warnings "REALITY warning: dest port is not 443, this may reduce stealth"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"non-443 port"* ]]
+  [[ "$output" == *"port 443 is recommended"* ]]
+}
+
+@test "xray::extract_compat_warnings - detects Apple/iCloud destination warning" {
+  run xray::extract_compat_warnings "WARNING: Apple/iCloud destination may block your IP"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Apple/iCloud REALITY destinations"* ]]
+  [[ "$output" == *"choose a different target"* ]]
+}
+
+@test "xray::extract_compat_warnings - detects iCloud risk warning" {
+  run xray::extract_compat_warnings "icloud.com dest risk of IP blocking detected"
+
+  [ "$status" -eq 0 ]
+  [[ "$output" == *"Apple/iCloud REALITY destinations"* ]]
+}
+
+@test "xray::extract_compat_warnings - no false positive for unrelated apple text" {
+  run xray::extract_compat_warnings "apple pie recipe is delicious"
+
+  [ "$status" -eq 0 ]
+  [ -z "$output" ]
+}
+
 @test "xray::generate_vless_encryption_pair - extracts decryption and encryption values" {
   local mock_bin="${TEST_TMPDIR}/mock-xray-vlessenc"
-  cat > "${mock_bin}" <<'EOF'
+  cat > "${mock_bin}" << 'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "vlessenc" ]]; then
   cat <<'JSON'
@@ -454,7 +484,7 @@ EOF
 
 @test "xray::generate_vless_encryption_pair - fails when output is incomplete" {
   local mock_bin="${TEST_TMPDIR}/mock-xray-vlessenc-bad"
-  cat > "${mock_bin}" <<'EOF'
+  cat > "${mock_bin}" << 'EOF'
 #!/usr/bin/env bash
 if [[ "${1:-}" == "vlessenc" ]]; then
   echo '{"decryption":"only-one-value"}'

@@ -102,6 +102,14 @@ ensure_reality_dest() {
     return "${ERR_INVALID_ARG}"
   fi
 
+  # Warn about Apple/iCloud REALITY destinations (v26.3.27+: risk of IP blocking)
+  case "${host}" in
+    *icloud-content.com | *cdn-apple.com | *mzstatic.com | *icloud.com | *apple.com)
+      core::log warn "Apple/iCloud REALITY dest may cause IP blocking (Xray v26.3.27+)" \
+        "$(printf '{"host":"%s","suggestion":"Use a non-Apple domain such as www.microsoft.com"}' "${host}")"
+      ;;
+  esac
+
   printf '%s:%s' "${host}" "${port}"
 }
 
@@ -250,6 +258,12 @@ xray::render_reality_inbound() {
   validators::vless_crypto_value "${vless_decryption}" || core::log fatal "invalid XRAY_VLESS_DECRYPTION" "$(printf '{"value":"%s"}' "${vless_decryption}")"
   [[ -n "${XRAY_PRIVATE_KEY}" ]] || core::log fatal "XRAY_PRIVATE_KEY required" "{}"
 
+  # Advisory: REALITY on non-443 port reduces stealth (v26.3.27+)
+  if [[ "${XRAY_PORT}" -ne 443 ]]; then
+    core::log warn "REALITY on non-443 port may reduce stealth (Xray v26.3.27+)" \
+      "$(printf '{"port":%d,"recommended":443}' "${XRAY_PORT}")"
+  fi
+
   # Prepare configuration values
   local first_sni="" reality_dest server_names shortids_pool sanitized_uuid sanitized_key
   server_names="$(json_array_from_csv "${XRAY_SNI}" "XRAY_SNI" first_sni)"
@@ -339,6 +353,12 @@ xray::render_vision_reality_inbounds() {
   validators::shortid "${XRAY_SHORT_ID_2:-}" || core::log fatal "invalid XRAY_SHORT_ID_2" "{}"
   validators::shortid "${XRAY_SHORT_ID_3:-}" || core::log fatal "invalid XRAY_SHORT_ID_3" "{}"
   validators::vless_crypto_value "${vless_decryption}" || core::log fatal "invalid XRAY_VLESS_DECRYPTION" "$(printf '{"value":"%s"}' "${vless_decryption}")"
+
+  # Advisory: REALITY on non-443 port reduces stealth (v26.3.27+)
+  if [[ "${XRAY_REALITY_PORT}" -ne 443 ]]; then
+    core::log warn "REALITY on non-443 port may reduce stealth (Xray v26.3.27+)" \
+      "$(printf '{"port":%d,"recommended":443}' "${XRAY_REALITY_PORT}")"
+  fi
 
   local first_sni="" reality_dest server_names shortids_pool sanitized_vision_uuid sanitized_reality_uuid sanitized_key
   server_names="$(json_array_from_csv "${XRAY_SNI}" "XRAY_SNI" first_sni)"
