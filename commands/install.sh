@@ -215,6 +215,14 @@ main() {
     core::log info "SNI validation passed" "$(printf '{"domain":"%s"}' "${sni_domain}")"
   fi
 
+  # Warn about Apple/iCloud REALITY destinations (v26.3.27+: risk of IP blocking)
+  case "${sni_domain,,}" in
+    *icloud-content.com | *cdn-apple.com | *mzstatic.com | *icloud.com | *apple.com)
+      core::log warn "Apple/iCloud REALITY dest may cause IP blocking (Xray v26.3.27+)" \
+        "$(printf '{"domain":"%s","suggestion":"Use a non-Apple domain such as www.microsoft.com"}' "${sni_domain}")"
+      ;;
+  esac
+
   # Generate shortIds pool (3 shortIds for multi-client scenarios)
   # Batch generate if none provided; fill missing ones individually otherwise
   if [[ -z "${XRAY_SHORT_ID:-}${XRAY_SHORT_ID_2:-}${XRAY_SHORT_ID_3:-}" ]]; then
