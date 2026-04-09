@@ -316,8 +316,8 @@ main() {
   plugins::emit install_post "topology=${TOPOLOGY}" "version=${VERSION}"
   "${HERE}/services/xray/configure.sh" --topology "${TOPOLOGY}"
 
-  # Apply TCP sysctl tuning for proxy workloads
-  net::apply_sysctl_tuning
+  # Apply TCP sysctl tuning for proxy workloads (non-fatal: containers may lack sysctl access)
+  net::apply_sysctl_tuning || core::log warn "sysctl tuning skipped" '{"suggestion":"apply manually on the host if running in a container"}'
 
   # Install and start systemd service
   "${HERE}/services/xray/systemd-unit.sh" install
