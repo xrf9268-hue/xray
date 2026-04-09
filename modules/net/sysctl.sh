@@ -73,7 +73,7 @@ net::apply_sysctl_tuning() {
   local conf_dir
   conf_dir="$(dirname "${XRF_SYSCTL_CONF}")"
   if ! io::ensure_dir "${conf_dir}"; then
-    core::log warn "cannot create sysctl conf dir" "$(printf '{"dir":"%s"}' "${conf_dir}")"
+    # io::ensure_dir already logs the specific mkdir/sudo failure
     return 1
   fi
 
@@ -82,10 +82,13 @@ net::apply_sysctl_tuning() {
     return 1
   fi
 
-  if ! sysctl -p "${XRF_SYSCTL_CONF}" > /dev/null 2>&1; then
-    core::log warn "sysctl -p failed" "$(printf '{"path":"%s","suggestion":"verify kernel support"}' "${XRF_SYSCTL_CONF}")"
+  local sysctl_out
+  if ! sysctl_out="$(sysctl -p "${XRF_SYSCTL_CONF}" 2>&1)"; then
+    core::log warn "sysctl -p failed" \
+      "$(printf '{"path":"%s","error":"%s","suggestion":"verify kernel support"}' \
+        "${XRF_SYSCTL_CONF}" "$(core::json_escape "${sysctl_out}")")"
     return 1
   fi
 
-  core::log info "TCP sysctl tuning applied" "{}"
+  core::log info "TCP sysctl tuning applied" "$(printf '{"path":"%s"}' "${XRF_SYSCTL_CONF}")"
 }
