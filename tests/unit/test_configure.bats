@@ -171,7 +171,7 @@ setup() {
     local dns_query_strategy="${2:-UseIPv4}"
     local log_level="${XRAY_LOG_LEVEL:-warning}"
 
-    printf '{"log":{"access":"none","error":"none","loglevel":"%s"}}' "${log_level}" \
+    printf '{"log":{"access":"none","error":"","loglevel":"%s"}}' "${log_level}" \
       | io::atomic_write "${release_dir}/${XRAY_CONFIG_00_LOG}" 0640
 
     printf '{"outbounds":[{"protocol":"freedom","tag":"direct"},{"protocol":"blackhole","tag":"block"}]}' \

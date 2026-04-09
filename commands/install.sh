@@ -13,6 +13,7 @@ HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 . "${HERE}/lib/backup.sh"
 . "${HERE}/lib/x25519.sh"
 . "${HERE}/modules/state.sh"
+. "${HERE}/modules/net/sysctl.sh"
 . "${HERE}/services/xray/common.sh"
 
 usage() {
@@ -307,13 +308,16 @@ main() {
     XRAY_VLESS_DECRYPTION="${XRAY_VLESS_DECRYPTION:-none}"
   fi
 
-  export XRAY_SNIFFING="${XRAY_SNIFFING:-false}"
+  export XRAY_SNIFFING="${XRAY_SNIFFING:-${DEFAULT_XRAY_SNIFFING}}"
   export XRAY_UUID XRAY_UUID_VISION XRAY_UUID_REALITY XRAY_SHORT_ID XRAY_SHORT_ID_2 XRAY_SHORT_ID_3 XRAY_SNI XRAY_REALITY_DEST \
     XRAY_PORT XRAY_VISION_PORT XRAY_REALITY_PORT XRAY_DOMAIN XRAY_CERT_DIR XRAY_FALLBACK_PORT \
     XRAY_PRIVATE_KEY XRAY_PUBLIC_KEY XRAY_VLESS_ENCRYPTION_ENABLED XRAY_VLESS_DECRYPTION XRAY_VLESS_ENCRYPTION
 
   plugins::emit install_post "topology=${TOPOLOGY}" "version=${VERSION}"
   "${HERE}/services/xray/configure.sh" --topology "${TOPOLOGY}"
+
+  # Apply TCP sysctl tuning for proxy workloads
+  net::apply_sysctl_tuning
 
   # Install and start systemd service
   "${HERE}/services/xray/systemd-unit.sh" install
