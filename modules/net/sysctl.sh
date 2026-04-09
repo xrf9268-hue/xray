@@ -70,12 +70,25 @@ net::apply_sysctl_tuning() {
 
   core::log info "applying TCP sysctl tuning" "$(printf '{"path":"%s"}' "${XRF_SYSCTL_CONF}")"
 
-  printf '%s\n' "${desired}" | io::atomic_write "${XRF_SYSCTL_CONF}" 0644
-
-  if ! sysctl -p "${XRF_SYSCTL_CONF}" > /dev/null 2>&1; then
-    core::log warn "sysctl -p failed" "$(printf '{"path":"%s","suggestion":"verify kernel support"}' "${XRF_SYSCTL_CONF}")"
+  local conf_dir
+  conf_dir="$(dirname "${XRF_SYSCTL_CONF}")"
+  if ! io::ensure_dir "${conf_dir}"; then
+    # io::ensure_dir already logs the specific mkdir/sudo failure
     return 1
   fi
 
-  core::log info "TCP sysctl tuning applied" "{}"
+  if ! printf '%s\n' "${desired}" | io::atomic_write "${XRF_SYSCTL_CONF}" 0644; then
+    core::log warn "failed to write sysctl conf" "$(printf '{"path":"%s"}' "${XRF_SYSCTL_CONF}")"
+    return 1
+  fi
+
+  local sysctl_out
+  if ! sysctl_out="$(sysctl -p "${XRF_SYSCTL_CONF}" 2>&1)"; then
+    core::log warn "sysctl -p failed" \
+      "$(printf '{"path":"%s","error":"%s","suggestion":"verify kernel support"}' \
+        "${XRF_SYSCTL_CONF}" "$(core::json_escape "${sysctl_out}")")"
+    return 1
+  fi
+
+  core::log info "TCP sysctl tuning applied" "$(printf '{"path":"%s"}' "${XRF_SYSCTL_CONF}")"
 }
