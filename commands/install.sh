@@ -216,7 +216,7 @@ main() {
   fi
 
   # Warn about Apple/iCloud REALITY destinations (v26.3.27+: risk of IP blocking)
-  case "${sni_domain}" in
+  case "${sni_domain,,}" in
     *icloud-content.com | *cdn-apple.com | *mzstatic.com | *icloud.com | *apple.com)
       core::log warn "Apple/iCloud REALITY dest may cause IP blocking (Xray v26.3.27+)" \
         "$(printf '{"domain":"%s","suggestion":"Use a non-Apple domain such as www.microsoft.com"}' "${sni_domain}")"

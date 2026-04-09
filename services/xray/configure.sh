@@ -103,7 +103,7 @@ ensure_reality_dest() {
   fi
 
   # Warn about Apple/iCloud REALITY destinations (v26.3.27+: risk of IP blocking)
-  case "${host}" in
+  case "${host,,}" in
     *icloud-content.com | *cdn-apple.com | *mzstatic.com | *icloud.com | *apple.com)
       core::log warn "Apple/iCloud REALITY dest may cause IP blocking (Xray v26.3.27+)" \
         "$(printf '{"host":"%s","suggestion":"Use a non-Apple domain such as www.microsoft.com"}' "${host}")"
