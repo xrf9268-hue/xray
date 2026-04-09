@@ -223,7 +223,7 @@ xray::write_base_configs() {
   esac
 
   # Logging configuration
-  printf '{"log":{"access":"none","error":"none","loglevel":"%s"}}' "${log_level}" \
+  printf '{"log":{"access":"none","error":"","loglevel":"%s"}}' "${log_level}" \
     | io::atomic_write "${release_dir}/${XRAY_CONFIG_00_LOG}" 0640
 
   # Outbounds configuration

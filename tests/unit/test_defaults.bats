@@ -47,8 +47,8 @@ teardown() {
   [ "${DEFAULT_XRAY_SNI}" = "www.microsoft.com" ]
 }
 
-@test "DEFAULT_XRAY_SNIFFING is false" {
-  [ "${DEFAULT_XRAY_SNIFFING}" = "false" ]
+@test "DEFAULT_XRAY_SNIFFING is true" {
+  [ "${DEFAULT_XRAY_SNIFFING}" = "true" ]
 }
 
 @test "DEFAULT_XRAY_FINGERPRINT is chrome" {
