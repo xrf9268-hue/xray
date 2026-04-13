@@ -142,7 +142,7 @@ jobs:
       - name: Upload test results
         if: always()
         # actions/upload-artifact@v7.0.0 (pinned to commit SHA for security)
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: test-results-${{ matrix.ubuntu-version }}
           path: artifacts/unit/*.xml
@@ -191,7 +191,7 @@ jobs:
       - name: Upload integration test results
         if: always()
         # actions/upload-artifact@v7.0.0 (pinned to commit SHA for security)
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: integration-test-results
           path: artifacts/integration/*.xml
@@ -365,7 +365,7 @@ jobs:
       - name: Upload coverage artifacts
         if: always()
         # actions/upload-artifact@v7.0.0 (pinned to commit SHA for security)
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: coverage-results
           path: artifacts/coverage/**
@@ -402,7 +402,7 @@ jobs:
       - name: Upload security report
         if: always()
         # actions/upload-artifact@v7.0.0 (pinned to commit SHA for security)
-        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: security-report
           path: shellcheck-report.json
