@@ -45,7 +45,7 @@ jobs:
       - name: Cache apt packages
         id: cache-apt
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           # Cache only .deb payloads in a user-writable directory.
           path: ${{ env.APT_CACHE_DIR }}/*.deb
@@ -72,7 +72,7 @@ jobs:
       - name: Cache shfmt binary
         id: cache-shfmt
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           path: ~/.local/bin/shfmt
           key: shfmt-v3.12.0-${{ runner.os }}
@@ -113,7 +113,7 @@ jobs:
       - name: Cache apt packages
         id: cache-apt-bats
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           # Cache only .deb payloads in a user-writable directory.
           path: ${{ env.APT_CACHE_DIR }}/*.deb
@@ -162,7 +162,7 @@ jobs:
       - name: Cache apt packages
         id: cache-apt-integration
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           # Cache only .deb payloads in a user-writable directory.
           path: ${{ env.APT_CACHE_DIR }}/*.deb
@@ -229,7 +229,7 @@ jobs:
       - name: Cache kcov binary
         id: cache-kcov
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@668228422ae6a00e4ad889ee87cd7109ec5666a7
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
         with:
           # Cache in user-writable directory to avoid tar permission errors
           # when restoring to root-owned /usr/local/bin (exit code 2).
