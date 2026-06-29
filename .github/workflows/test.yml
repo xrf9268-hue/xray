@@ -40,12 +40,12 @@ jobs:
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Cache apt packages
         id: cache-apt
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           # Cache only .deb payloads in a user-writable directory.
           path: ${{ env.APT_CACHE_DIR }}/*.deb
@@ -67,12 +67,12 @@ jobs:
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Cache shfmt binary
         id: cache-shfmt
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           path: ~/.local/bin/shfmt
           key: shfmt-v3.12.0-${{ runner.os }}
@@ -108,12 +108,12 @@ jobs:
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Cache apt packages
         id: cache-apt-bats
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           # Cache only .deb payloads in a user-writable directory.
           path: ${{ env.APT_CACHE_DIR }}/*.deb
@@ -157,12 +157,12 @@ jobs:
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Cache apt packages
         id: cache-apt-integration
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           # Cache only .deb payloads in a user-writable directory.
           path: ${{ env.APT_CACHE_DIR }}/*.deb
@@ -209,7 +209,7 @@ jobs:
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Install coverage dependencies
         run: |
@@ -229,7 +229,7 @@ jobs:
       - name: Cache kcov binary
         id: cache-kcov
         # actions/cache@v5.0.3 (pinned to commit SHA for security)
-        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9
         with:
           # Cache in user-writable directory to avoid tar permission errors
           # when restoring to root-owned /usr/local/bin (exit code 2).
@@ -379,7 +379,7 @@ jobs:
     steps:
       - name: Checkout code
         # actions/checkout@v6.0.2 (pinned to commit SHA for security)
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
 
       - name: Run ShellCheck security checks
         run: |
