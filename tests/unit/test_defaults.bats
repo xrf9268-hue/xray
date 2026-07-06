@@ -43,8 +43,8 @@ teardown() {
   [ "${DEFAULT_XRAY_CERT_DIR}" = "/usr/local/etc/xray/certs" ]
 }
 
-@test "DEFAULT_XRAY_SNI is www.microsoft.com" {
-  [ "${DEFAULT_XRAY_SNI}" = "www.microsoft.com" ]
+@test "DEFAULT_XRAY_SNI is www.apple.com" {
+  [ "${DEFAULT_XRAY_SNI}" = "www.apple.com" ]
 }
 
 @test "DEFAULT_XRAY_SNIFFING is true" {

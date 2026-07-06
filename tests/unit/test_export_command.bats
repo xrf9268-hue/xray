@@ -57,6 +57,23 @@ decode_base64() {
   [[ "${output}" == *"vless://11111111-2222-3333-4444-555555555555@203.0.113.10:443"* ]]
 }
 
+@test "export uri - uses default SNI when not specified" {
+  write_state '{
+    "name": "reality-only",
+    "xray": {
+      "port": 443,
+      "uuid": "11111111-2222-3333-4444-555555555555",
+      "short_id": "abcd1234ef567890",
+      "reality_public_key": "Base64PublicKey=="
+    }
+  }'
+
+  run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/commands/export.sh" uri
+
+  [ "${status}" -eq 0 ]
+  [[ "${output}" == *"sni=www.apple.com"* ]]
+}
+
 @test "export sub - emits base64 subscription for all links" {
   write_state '{
     "name": "vision-reality",
