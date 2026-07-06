@@ -299,8 +299,8 @@ JSON
   run env XRAY_SERVER_IP=203.0.113.10 "${PROJECT_ROOT}/services/xray/client-links.sh" reality-only
 
   [ "$status" -eq 0 ]
-  # Default SNI should be www.microsoft.com
-  [[ "${output}" =~ sni=www.microsoft.com ]]
+  # Default SNI should be www.apple.com
+  [[ "${output}" =~ sni=www.apple.com ]]
 }
 
 @test "client-links defaults to reality-only topology" {

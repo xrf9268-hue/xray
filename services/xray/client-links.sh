@@ -21,7 +21,7 @@ main() {
     echo "${state}" | jq -r '
       [
         .name // .topology // "reality-only",
-        .xray.reality_sni // "www.microsoft.com",
+        .xray.reality_sni // "www.apple.com",
         .xray.short_id // "",
         .xray.reality_public_key // "",
         .xray.vision_port // "8443",

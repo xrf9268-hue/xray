@@ -249,7 +249,7 @@ xray::render_reality_inbound() {
   local vless_decryption="${XRAY_VLESS_DECRYPTION:-none}"
 
   # Validate required variables
-  : "${XRAY_PORT:=443}" : "${XRAY_UUID:?}" : "${XRAY_SNI:=www.microsoft.com}"
+  : "${XRAY_PORT:=443}" : "${XRAY_UUID:?}" : "${XRAY_SNI:=www.apple.com}"
   : "${XRAY_SHORT_ID:?}" : "${XRAY_PRIVATE_KEY:?}"
 
   validators::port "${XRAY_PORT}" || core::log fatal "invalid XRAY_PORT" "$(printf '{"port":"%s"}' "${XRAY_PORT}")"
@@ -327,7 +327,7 @@ xray::render_vision_reality_inbounds() {
   : "${XRAY_VISION_PORT:=8443}" : "${XRAY_REALITY_PORT:=443}"
   : "${XRAY_UUID_VISION:?}" : "${XRAY_UUID_REALITY:?}" : "${XRAY_DOMAIN:?}"
   : "${XRAY_CERT_DIR:=/usr/local/etc/xray/certs}" : "${XRAY_FALLBACK_PORT:=8080}"
-  : "${XRAY_SNI:=www.microsoft.com}" : "${XRAY_SHORT_ID:?}" : "${XRAY_PRIVATE_KEY:?}"
+  : "${XRAY_SNI:=www.apple.com}" : "${XRAY_SHORT_ID:?}" : "${XRAY_PRIVATE_KEY:?}"
 
   core::log debug "vision-reality variables set" "$(printf '{"vision_port":"%s","reality_port":"%s","domain":"%s"}' \
     "${XRAY_VISION_PORT}" "${XRAY_REALITY_PORT}" "${XRAY_DOMAIN}")"

@@ -156,7 +156,7 @@ EOF
 @test "templates::export - exports SNI for home template" {
   run bash -c 'source lib/templates.sh && templates::export "home" && echo "SNI=$TEMPLATE_SNI"'
   [ "$status" -eq 0 ]
-  [[ "$output" =~ "SNI=www.microsoft.com" ]]
+  [[ "$output" =~ "SNI=www.apple.com" ]]
 }
 
 @test "templates::export - exports topology-specific ports" {

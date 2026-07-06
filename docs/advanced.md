@@ -37,7 +37,7 @@ curl -sL install.sh | bash -s -- --template office --domain vpn.company.com
 
 ### Reality-only
 - No domain required
-- SNI camouflage (default: `www.microsoft.com`)
+- SNI camouflage (default: `www.apple.com`)
 - Port: 443
 - Supports optional VLESS Encryption (`decryption` configurable)
 - Auto network profile: IPv4-only hosts use `listen: 0.0.0.0` + `dns.queryStrategy: UseIPv4`
@@ -91,7 +91,7 @@ xrf export all --out-dir /tmp/xrf-export
 ## Environment Variables
 
 ```bash
-XRAY_SNI=www.microsoft.com                    # Reality SNI
+XRAY_SNI=www.apple.com                        # Reality SNI
 XRAY_VISION_PORT=8443                         # Vision port
 XRAY_REALITY_PORT=443                         # Reality port
 XRAY_VLESS_ENCRYPTION_ENABLED=false           # Optional VLESS Encryption switch

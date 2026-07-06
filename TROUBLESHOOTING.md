@@ -352,7 +352,7 @@ sudo ufw allow 443/tcp
 systemctl status xray
 
 # Check server_name matches client configuration
-# Client SNI must match XRAY_SNI value (default: www.microsoft.com)
+# Client SNI must match XRAY_SNI value (default: www.apple.com)
 ```
 
 **Related**: Reality protocol configuration

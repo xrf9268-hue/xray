@@ -27,7 +27,7 @@ export::load_context() {
     echo "${state}" | jq -r '
       [
         .name // .topology // "reality-only",
-        .xray.reality_sni // "www.microsoft.com",
+        .xray.reality_sni // "www.apple.com",
         .xray.short_id // "",
         .xray.reality_public_key // "",
         .xray.vision_port // "8443",
@@ -44,7 +44,7 @@ export::load_context() {
   )
 
   EX_TOPO="${fields[0]:-reality-only}"
-  EX_SNI="${fields[1]:-www.microsoft.com}"
+  EX_SNI="${fields[1]:-www.apple.com}"
   EX_SID="${fields[2]:-}"
   EX_PBK="${fields[3]:-}"
   EX_VPORT="${fields[4]:-8443}"

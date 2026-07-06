@@ -28,7 +28,7 @@ EOF
 Xray Configuration Variables:
   XRAY_SNIFFING=false|true
   # reality-only
-  XRAY_PORT=443 XRAY_UUID=<uuid> XRAY_SNI=www.microsoft.com[,alt] XRAY_REALITY_DEST=www.microsoft.com XRAY_PRIVATE_KEY=<X25519> XRAY_SHORT_ID=<hex>
+  XRAY_PORT=443 XRAY_UUID=<uuid> XRAY_SNI=www.apple.com[,alt] XRAY_REALITY_DEST=www.apple.com XRAY_PRIVATE_KEY=<X25519> XRAY_SHORT_ID=<hex>
   # vision-reality
   XRAY_VISION_PORT=8443 XRAY_REALITY_PORT=443 XRAY_FALLBACK_PORT=8080 XRAY_UUID_VISION=<uuid> XRAY_UUID_REALITY=<uuid> XRAY_CERT_DIR=/usr/local/etc/xray/certs XRAY_PRIVATE_KEY=<X25519> XRAY_SHORT_ID=<hex>
   # Optional VLESS Encryption (advanced)

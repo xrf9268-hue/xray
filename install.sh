@@ -454,7 +454,7 @@ Environment Variables:
   XRF_INSTALL_DIR   Installation directory (default: /usr/local/xray-fusion)
 
 Xray Configuration Variables:
-  XRAY_SNI          SNI domain (default: www.microsoft.com)
+  XRAY_SNI          SNI domain (default: www.apple.com)
   XRAY_PORT         Listen port (default: 443)
   XRAY_UUID         User UUID (auto-generated if not set)
   XRAY_*            All other Xray configuration variables

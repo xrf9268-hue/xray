@@ -23,7 +23,7 @@ readonly DEFAULT_CADDY_CERT_BASE="/root/.local/share/caddy/certificates"
 readonly DEFAULT_XRAY_CERT_DIR="/usr/local/etc/xray/certs"
 
 # === Reality Protocol Defaults ===
-readonly DEFAULT_XRAY_SNI="www.microsoft.com"
+readonly DEFAULT_XRAY_SNI="www.apple.com"
 readonly DEFAULT_XRAY_SNIFFING="true"
 readonly DEFAULT_XRAY_FINGERPRINT="chrome"
 readonly DEFAULT_XRAY_VLESS_ENCRYPTION_ENABLED="false"
